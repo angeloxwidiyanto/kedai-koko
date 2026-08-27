@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { rupiah } from '../lib/format'
+import ImageCropper from './ImageCropper'
 import {
   archiveProduct,
   createCategory,
@@ -548,19 +549,26 @@ function ProductForm({ product, categories, onClose, onSave }) {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
+  const [cropSrc, setCropSrc] = useState(null)
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  async function handleFile(e) {
+  function handleFile(e) {
     const file = e.target.files && e.target.files[0]
     e.target.value = ''
     if (!file) return
     setUploadErr('')
+    setCropSrc(URL.createObjectURL(file))
+  }
+
+  async function handleCropped(blob) {
+    setCropSrc(null)
     setUploading(true)
+    setUploadErr('')
     try {
-      const res = await uploadImage(file)
+      const res = await uploadImage(new File([blob], 'foto.jpg', { type: 'image/jpeg' }))
       set('imageUrl', res.url)
     } catch (err) {
       setUploadErr(err.message)
@@ -672,6 +680,17 @@ function ProductForm({ product, categories, onClose, onSave }) {
           </button>
         </div>
       </motion.form>
+
+      <AnimatePresence>
+        {cropSrc && (
+          <ImageCropper
+            key={cropSrc}
+            src={cropSrc}
+            onCancel={() => { URL.revokeObjectURL(cropSrc); setCropSrc(null) }}
+            onDone={(blob) => { URL.revokeObjectURL(cropSrc); handleCropped(blob) }}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
