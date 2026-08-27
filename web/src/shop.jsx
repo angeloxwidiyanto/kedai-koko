@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getCategories, getProducts, getMe, setAuthToken, login as apiLogin } from './lib/api'
+import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin } from './lib/api'
 
 const ShopContext = createContext(null)
 
@@ -40,6 +40,12 @@ export function ShopProvider({ children }) {
   }, [cart])
 
   useEffect(() => {
+    if (!hasAuthToken()) {
+      setAuthRequired(true)
+      setLoading(false)
+      return
+    }
+
     let active = true
     setLoading(true)
     setError(null)

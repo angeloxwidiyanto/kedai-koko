@@ -2117,6 +2117,26 @@ button {
   cursor: pointer;
 }
 
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.upload-btn {
+  min-height: 44px;
+  cursor: pointer;
+}
+.upload-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: 2px solid var(--outline-variant);
+}
+.upload-error {
+  margin: 0;
+}
+
 .state-box-small {
   padding: 20px;
   border-width: 2px;

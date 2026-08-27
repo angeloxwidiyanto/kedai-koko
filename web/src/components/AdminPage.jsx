@@ -21,6 +21,7 @@ import {
   updateCategory,
   updateProduct,
   updateUser,
+  uploadImage,
 } from '../lib/api'
 
 function todayStr(offset = 0) {
@@ -545,9 +546,27 @@ function ProductForm({ product, categories, onClose, onSave }) {
     tags: (product.tags || []).join(', '),
   })
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  async function handleFile(e) {
+    const file = e.target.files && e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadErr('')
+    setUploading(true)
+    try {
+      const res = await uploadImage(file)
+      set('imageUrl', res.url)
+    } catch (err) {
+      setUploadErr(err.message)
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function submit(e) {
@@ -623,6 +642,23 @@ function ProductForm({ product, categories, onClose, onSave }) {
             URL Foto (opsional)
             <input value={form.imageUrl || ''} onChange={(e) => set('imageUrl', e.target.value)} placeholder="https://..." />
           </label>
+          <div className="upload-row">
+            <input
+              id="img-upload"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleFile}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="img-upload" className="btn btn-secondary btn-sm upload-btn">
+              <span className="material-symbols-outlined">upload</span>
+              {uploading ? 'Mengunggah...' : 'Upload Gambar'}
+            </label>
+            {form.imageUrl && (
+              <img className="upload-preview" src={form.imageUrl} alt="Pratinjau" />
+            )}
+          </div>
+          {uploadErr && <p className="form-error upload-error">{uploadErr}</p>}
           <label className="field">
             Tag (pisahkan dengan koma)
             <input value={form.tags} onChange={(e) => set('tags', e.target.value)} placeholder="Halal, Best Seller" />

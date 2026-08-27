@@ -79,6 +79,7 @@ func Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/products/{id}/stock", HandleSetStock)
 	mux.HandleFunc("POST /api/products/{id}/archive", HandleArchiveProduct)
 	mux.HandleFunc("POST /api/products/{id}/restore", HandleRestoreProduct)
+	mux.HandleFunc("POST /api/admin/upload", HandleUploadImage)
 
 	mux.HandleFunc("POST /api/categories", HandleCreateCategory)
 	mux.HandleFunc("PUT /api/categories/{id}", HandleUpdateCategory)

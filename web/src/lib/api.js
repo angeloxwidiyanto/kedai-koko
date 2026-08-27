@@ -188,3 +188,14 @@ export function setPackagingStock(stock) {
     method: 'PATCH', headers: headers(), body: JSON.stringify({ stock }),
   }).then(json)
 }
+
+// --- Upload gambar (admin) ---
+export function uploadImage(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return fetch('/api/admin/upload', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body: form,
+  }).then(json)
+}
