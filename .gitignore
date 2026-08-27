@@ -1,0 +1,16 @@
+# Go
+bin/
+*.exe
+
+# Node
+node_modules/
+web/dist/
+cmd/server/dist/
+web/node_modules/
+
+# Env
+.env
+.env.local
+
+# OS
+.DS_Store

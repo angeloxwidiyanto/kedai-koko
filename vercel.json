@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "go",
+  "buildCommand": "cd web && npm install && npm run build && cd .. && go build -tags embed -o bin/server ./cmd/server"
+}
