@@ -9,7 +9,7 @@ const NAV = [
 
 const ADMIN_NAV = [{ id: 'admin', label: 'Admin', icon: 'dashboard' }]
 
-export default function TopNav({ page, onNav, onCart }) {
+export default function TopNav({ page, onNav, onCart, onPrinter }) {
   const { count, role, user, logout } = useShop()
   const items = role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV
 
@@ -35,6 +35,14 @@ export default function TopNav({ page, onNav, onCart }) {
       </nav>
 
       <div className="nav-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onPrinter}
+          aria-label="Pengaturan printer"
+        >
+          <span className="material-symbols-outlined">print</span>
+        </button>
         <button
           type="button"
           className="icon-btn"

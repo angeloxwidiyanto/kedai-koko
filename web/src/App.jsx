@@ -9,8 +9,11 @@ import AdminPage from './components/AdminPage'
 import PaymentModal from './components/PaymentModal'
 import SuccessOverlay from './components/SuccessOverlay'
 import PrintTicket from './components/PrintTicket'
+import PrinterModal from './components/PrinterModal'
 import LoginGate from './components/LoginGate'
 import Toast from './components/Toast'
+import * as printer from './lib/printer'
+import * as escpos from './lib/escpos'
 
 function Shell() {
   const { count, orderType, role, authRequired, login } = useShop()
@@ -19,6 +22,8 @@ function Shell() {
   const [success, setSuccess] = useState(null)
   const [printState, setPrintState] = useState(null)
   const [toast, setToast] = useState(null)
+  const [printerOpen, setPrinterOpen] = useState(false)
+  const [printerConnected, setPrinterConnected] = useState(false)
 
   function showToast(message) {
     setToast({ id: Date.now(), message })
@@ -51,9 +56,19 @@ function Shell() {
     setPage('menu')
   }
 
-  const handlePrint = useCallback((order, kind = 'kitchen') => {
+  const handlePrint = useCallback(async (order, kind = 'kitchen') => {
+    if (printerConnected) {
+      try {
+        const data = kind === 'receipt' ? escpos.receipt(order) : escpos.kitchenTicket(order)
+        await printer.print(data)
+        showToast('Tercetak')
+      } catch {
+        setPrintState({ order, kind }) // fallback browser print
+      }
+      return
+    }
     setPrintState({ order, kind })
-  }, [])
+  }, [printerConnected])
 
   useEffect(() => {
     if (!printState) return
@@ -68,6 +83,12 @@ function Shell() {
       window.removeEventListener('afterprint', onAfterPrint)
     }
   }, [printState])
+
+  useEffect(() => {
+    const unsub = printer.subscribe((dev) => setPrinterConnected(!!dev))
+    if (printer.isSupported()) printer.autoReconnect()
+    return unsub
+  }, [])
 
   function handleCartClick() {
     if (count === 0) {
@@ -91,7 +112,18 @@ function Shell() {
     <div className="app">
       {authRequired && <LoginGate onLogin={handleLogin} />}
 
-      <TopNav page={page} onNav={setPage} onCart={handleCartClick} />
+      <TopNav page={page} onNav={setPage} onCart={handleCartClick} onPrinter={() => setPrinterOpen(true)} />
+
+      {printer.isSupported() && !printerConnected && !authRequired && (
+        <button
+          type="button"
+          className="printer-banner"
+          onClick={() => setPrinterOpen(true)}
+        >
+          <span className="material-symbols-outlined">print</span>
+          Sambungkan printer
+        </button>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.main
@@ -128,6 +160,8 @@ function Shell() {
       </AnimatePresence>
 
       <PrintTicket order={printState?.order} kind={printState?.kind} />
+
+      <PrinterModal open={printerOpen} onClose={() => setPrinterOpen(false)} />
 
       <AnimatePresence>
         {toast && (

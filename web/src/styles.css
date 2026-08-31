@@ -2189,6 +2189,66 @@ button {
   accent-color: var(--primary);
 }
 
+/* ===== Printer ===== */
+.printer-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--on-surface-variant);
+  font-weight: 700;
+}
+.printer-status.on {
+  background: #e8f3e9;
+  color: var(--green);
+}
+.printer-status .material-symbols-outlined {
+  font-size: 24px;
+}
+.printer-actions {
+  display: flex;
+  gap: 10px;
+}
+.printer-actions .btn {
+  flex: 1;
+}
+
+.printer-banner {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 18px;
+  border: 3px solid var(--on-bg);
+  border-radius: var(--r-full);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(37, 25, 19, 0.25);
+  transition: transform 0.15s ease;
+}
+.printer-banner:active {
+  transform: scale(0.96);
+}
+.printer-banner .material-symbols-outlined {
+  font-size: 22px;
+}
+@media (max-width: 640px) {
+  .printer-banner {
+    left: 16px;
+    right: 16px;
+    justify-content: center;
+  }
+}
+
 .state-box-small {
   padding: 20px;
   border-width: 2px;
