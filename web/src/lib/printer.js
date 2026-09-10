@@ -201,31 +201,22 @@ export function printViaRawBTWebSocket(bytes, timeoutMs = 800) {
 // Mencoba cetak melalui Intent / URL Scheme RawBT
 export function printViaRawBTIntent(bytes) {
   const base64 = uint8ToBase64(bytes)
+  // Format resmi RawBT: rawbt:data:application/octet-stream;base64,<BASE64_DATA>
+  const rawbtUrl = `rawbt:data:application/octet-stream;base64,${base64}`
 
-  if (isAndroid()) {
-    // Di Chrome/Edge Android, Intent URL langsung menembus ke RawBT tanpa refresh tab
-    const intentUrl = `intent:${base64}#Intent;scheme=rawbt;type=application/octet-stream;package=ru.a402d.rawbtprinter;end;`
+  try {
+    window.location.href = rawbtUrl
+  } catch {
     const a = document.createElement('a')
-    a.href = intentUrl
+    a.href = rawbtUrl
     a.style.display = 'none'
     document.body.appendChild(a)
     a.click()
     setTimeout(() => {
       try { document.body.removeChild(a) } catch {}
     }, 1000)
-    return { method: 'intent' }
   }
 
-  // URL Scheme standar
-  const schemeUrl = `rawbt:data:application/octet-stream;base64,${base64}`
-  const a = document.createElement('a')
-  a.href = schemeUrl
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  setTimeout(() => {
-    try { document.body.removeChild(a) } catch {}
-  }, 1000)
   return { method: 'scheme' }
 }
 
