@@ -69,6 +69,29 @@ function itemRow(qtyName, priceStr, width = WIDTH) {
   ]
 }
 
+// Format catatan item agar rapi dan membungkus kata dengan indentasi jika panjang
+function noteLines(note, width = WIDTH) {
+  const c = clean(note)
+  if (!c) return []
+  const prefix = '  * Catatan: '
+  const full = prefix + c
+  if (full.length <= width) return [full]
+  const words = c.split(' ')
+  const lines = []
+  let curr = prefix
+  for (const w of words) {
+    const test = curr + (curr === prefix ? '' : ' ') + w
+    if (test.length <= width) {
+      curr = test
+    } else {
+      lines.push(curr)
+      curr = '    ' + w
+    }
+  }
+  if (curr.trim()) lines.push(curr)
+  return lines
+}
+
 function init() {
   bytes = []
   push(ESC, 0x40) // ESC @ init
@@ -126,7 +149,11 @@ export function kitchenTicket(order) {
 
   for (const it of order.items) {
     line(`${it.qty}x ${clean(it.name)}`)
-    if (it.note) line('  ' + clean(it.note))
+    if (it.note) {
+      for (const nl of noteLines(it.note)) {
+        line(nl)
+      }
+    }
   }
   divider()
 
@@ -164,7 +191,11 @@ export function receipt(order) {
     for (const l of lines) {
       line(l)
     }
-    if (it.note) line('  ' + clean(it.note))
+    if (it.note) {
+      for (const nl of noteLines(it.note)) {
+        line(nl)
+      }
+    }
   }
   divider()
 

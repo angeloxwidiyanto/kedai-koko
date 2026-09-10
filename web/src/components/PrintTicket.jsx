@@ -37,7 +37,7 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
             <span className="pt-name">{it.name}</span>
             {isReceipt && <span className="pt-price">{rupiah(it.price * it.qty)}</span>}
           </div>
-          {it.note ? <div className="pt-note">Catatan: {it.note}</div> : null}
+          {it.note ? <div className="pt-note">* Catatan: {it.note}</div> : null}
         </div>
       ))}
 
