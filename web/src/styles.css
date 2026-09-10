@@ -68,6 +68,10 @@ html,
 body,
 #root {
   height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
@@ -77,6 +81,8 @@ body {
   font-size: var(--fs-body-md);
   line-height: var(--lh-body-md);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 button {
@@ -96,9 +102,46 @@ button {
 }
 
 .app {
-  min-height: 100%;
+  height: 100%;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.page:has(.menu-layout) {
+  overflow: hidden;
+}
+
+/* ===== Sleek Scrollbars ===== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline-variant) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: var(--r-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline);
 }
 
 /* ===== Buttons ===== */
@@ -314,25 +357,29 @@ button {
 /* ===== Menu layout ===== */
 .menu-layout {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 .cat-sidebar {
-  position: sticky;
-  top: var(--nav-h);
   display: none;
   flex-direction: column;
   gap: var(--stack-md);
-  width: 264px;
+  width: 240px;
   flex-shrink: 0;
-  height: calc(100vh - var(--nav-h));
+  height: 100%;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: var(--gutter);
   background: var(--surface-low);
   border-right: 4px solid var(--on-surface);
 }
-@media (min-width: 1024px) {
+@media (min-width: 1180px) {
   .cat-sidebar {
     display: flex;
   }
@@ -387,6 +434,10 @@ button {
 .menu-main {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: var(--gutter);
   padding-bottom: 140px;
 }
@@ -405,8 +456,12 @@ button {
   margin-bottom: var(--stack-md);
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-@media (min-width: 1024px) {
+.cat-chips::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 1180px) {
   .cat-chips {
     display: none;
   }
@@ -611,22 +666,22 @@ button {
 
 /* ===== Cart panel ===== */
 .cart-panel {
-  position: sticky;
-  top: var(--nav-h);
   display: none;
   flex-direction: column;
-  width: 380px;
+  width: 360px;
   flex-shrink: 0;
-  height: calc(100vh - var(--nav-h));
+  height: 100%;
   background: var(--surface-lowest);
   border-left: 4px solid var(--on-surface);
+  overflow: hidden;
 }
-@media (min-width: 1280px) {
+@media (min-width: 960px) {
   .cart-panel {
     display: flex;
   }
 }
 .cart-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -742,6 +797,7 @@ button {
 }
 
 .cart-totals {
+  flex-shrink: 0;
   padding: var(--gutter);
   background: var(--surface-highest);
   border-top: 4px solid var(--on-surface);
@@ -783,7 +839,7 @@ button {
   background: var(--surface-highest);
   border-top: 4px solid var(--on-surface);
 }
-@media (min-width: 1280px) {
+@media (min-width: 960px) {
   .mobile-bar {
     display: none;
   }
