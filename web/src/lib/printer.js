@@ -201,8 +201,9 @@ export function printViaRawBTWebSocket(bytes, timeoutMs = 800) {
 // Mencoba cetak melalui Intent / URL Scheme RawBT
 export function printViaRawBTIntent(bytes) {
   const base64 = uint8ToBase64(bytes)
-  // Format resmi RawBT: rawbt:data:application/octet-stream;base64,<BASE64_DATA>
-  const rawbtUrl = `rawbt:data:application/octet-stream;base64,${base64}`
+  // Format resmi RawBT untuk teks & ESC/POS adalah data:text/plain;base64,
+  // RawBT TIDAK mengenali application/octet-stream dan akan menampilkan "Empty print job" jika bukan text/plain
+  const rawbtUrl = `rawbt:data:text/plain;base64,${base64}`
 
   try {
     window.location.href = rawbtUrl

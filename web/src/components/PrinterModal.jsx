@@ -156,11 +156,19 @@ export default function PrinterModal({ open, onClose }) {
                 <span>Mode RawBT Aktif</span>
               </div>
 
-              <div className="printer-actions">
+              <div className="printer-actions" style={{ flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-primary" onClick={doTestRawBT} disabled={busy}>
                   <span className="material-symbols-outlined">receipt_long</span>
                   {busy ? 'Mengirim...' : 'Uji Cetak RawBT'}
                 </button>
+                <a
+                  href={`rawbt:data:text/plain;base64,${printer.uint8ToBase64(escpos.testTicket())}`}
+                  className="btn btn-secondary"
+                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <span className="material-symbols-outlined">open_in_new</span>
+                  Tautan Langsung RawBT
+                </a>
               </div>
 
               <div className="rawbt-instructions">
