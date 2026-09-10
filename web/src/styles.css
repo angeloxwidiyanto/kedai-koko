@@ -1519,6 +1519,12 @@ button {
     font-size: 18px;
     margin: 4px 0;
   }
+  .pt-powered {
+    text-align: center;
+    font-size: 11px;
+    margin-top: 6px;
+    font-weight: 500;
+  }
 }
 
 /* ===== Login gate ===== */

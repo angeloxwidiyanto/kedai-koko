@@ -72,11 +72,13 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
           <div className="pt-rule" />
           <div className="pt-lunas">LUNAS</div>
           <div className="pt-footer">Terima kasih</div>
+          <div className="pt-powered">powered by Slovana Inovasi Digital</div>
         </>
       ) : (
         <>
           <div className="pt-rule" />
           <div className="pt-footer">Siapkan pesanan</div>
+          <div className="pt-powered">powered by Slovana Inovasi Digital</div>
         </>
       )}
     </div>

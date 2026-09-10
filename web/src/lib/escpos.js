@@ -1,14 +1,13 @@
-// Builder ESC/POS untuk printer termal (SNBC BTP-U60, 80mm).
+// Builder ESC/POS untuk printer termal (80mm / Font A, lebar 42 kolom).
 // Semua output berupa Uint8Array perintah ESC/POS.
 
-const WIDTH = 48 // 80mm, Font A (48 karakter/baris)
+const WIDTH = 42 // Lebar cetak thermal printer standar (42 kolom tanpa terpotong)
 
 // Perintah dasar
 const ESC = 0x1b
 const GS = 0x1d
 
-const out = []
-let bytes
+let bytes = []
 
 function push(...b) {
   bytes.push(...b)
@@ -47,6 +46,27 @@ function center(s) {
 
 function divider() {
   line('-'.repeat(WIDTH))
+}
+
+// Format 2 kolom: kiri rata kiri, kanan rata kanan pas di batas lebar kertas
+function twoCol(left, right, width = WIDTH) {
+  left = clean(left)
+  right = clean(right)
+  const spaces = Math.max(1, width - left.length - right.length)
+  return left + ' '.repeat(spaces) + right
+}
+
+// Format baris item: jika nama terlalu panjang, harga tetap rata kanan tanpa memotong nominal
+function itemRow(qtyName, priceStr, width = WIDTH) {
+  qtyName = clean(qtyName)
+  priceStr = clean(priceStr)
+  if (qtyName.length + priceStr.length + 1 <= width) {
+    return [twoCol(qtyName, priceStr, width)]
+  }
+  return [
+    qtyName,
+    ' '.repeat(Math.max(1, width - priceStr.length)) + priceStr,
+  ]
 }
 
 function init() {
@@ -100,7 +120,7 @@ export function kitchenTicket(order) {
   }
 
   for (const [k, v] of rows) {
-    line(padRight(k, 6) + clean(v))
+    line(padRight(k, 7) + clean(v))
   }
   divider()
 
@@ -112,6 +132,8 @@ export function kitchenTicket(order) {
 
   align(1)
   line('Siapkan pesanan')
+  feed(1)
+  line('powered by Slovana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -130,26 +152,31 @@ export function receipt(order) {
     rows.push(['Meja', order.tableNo || '-'])
   }
   for (const [k, v] of rows) {
-    line(padRight(k, 6) + clean(v))
+    line(padRight(k, 7) + clean(v))
   }
   divider()
 
   for (const it of order.items) {
-    line(padRight(`${it.qty}x ${it.name}`, WIDTH - 10) + padRight(rupiah(it.price * it.qty), 10))
+    const qtyName = `${it.qty}x ${it.name}`
+    const priceStr = rupiah(it.price * it.qty)
+    const lines = itemRow(qtyName, priceStr)
+    for (const l of lines) {
+      line(l)
+    }
     if (it.note) line('  ' + clean(it.note))
   }
   divider()
 
-  line(padRight('Subtotal', WIDTH - 10) + padRight(rupiah(order.subtotal || order.total), 10))
+  line(twoCol('Subtotal', rupiah(order.subtotal || order.total)))
   if (order.discountAmount > 0) {
-    line(padRight('Diskon', WIDTH - 10) + padRight('-' + rupiah(order.discountAmount), 10))
+    line(twoCol('Diskon', '-' + rupiah(order.discountAmount)))
   }
   bold(true)
-  line(padRight('TOTAL', WIDTH - 10) + padRight(rupiah(order.total), 10))
+  line(twoCol('TOTAL', rupiah(order.total)))
   bold(false)
-  line(padRight('Dibayar', WIDTH - 10) + padRight(rupiah(order.paid), 10))
-  line(padRight('Kembalian', WIDTH - 10) + padRight(rupiah(order.change), 10))
-  line(padRight('Metode', WIDTH - 10) + padRight(order.paymentMethod === 'qris' ? 'QRIS' : 'TUNAI', 10))
+  line(twoCol('Dibayar', rupiah(order.paid)))
+  line(twoCol('Kembalian', rupiah(order.change)))
+  line(twoCol('Metode', order.paymentMethod === 'qris' ? 'QRIS' : 'TUNAI'))
   divider()
 
   align(1)
@@ -157,6 +184,8 @@ export function receipt(order) {
   line('LUNAS')
   bold(false)
   line('Terima kasih')
+  feed(1)
+  line('powered by Slovana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -173,6 +202,8 @@ export function testTicket() {
   line(center('Test Printer OK'))
   line(center('Pesan ini tercetak'))
   line(center('dari aplikasi kasir.'))
+  feed(1)
+  line(center('powered by Slovana Inovasi Digital'))
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -181,3 +212,4 @@ export function testTicket() {
 function rupiah(n) {
   return 'Rp' + Number(n || 0).toLocaleString('id-ID')
 }
+
