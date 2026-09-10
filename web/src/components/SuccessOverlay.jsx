@@ -1,10 +1,15 @@
 import { motion } from 'framer-motion'
 import { rupiah } from '../lib/format'
+import * as printer from '../lib/printer'
+import * as escpos from '../lib/escpos'
 
 const COLORS = ['#9e3d00', '#ffb595', '#c64f00', '#e9e2d3', '#ffdbcd', '#f4c07a']
 
 export default function SuccessOverlay({ order, onClose, onPrint }) {
   const pieces = Array.from({ length: 40 })
+  const isRawBT = printer.getPrintMode() === 'rawbt'
+  const receiptUrl = isRawBT ? printer.getRawBTUrl(escpos.receipt(order)) : ''
+  const kitchenUrl = isRawBT ? printer.getRawBTUrl(escpos.kitchenTicket(order)) : ''
 
   return (
     <motion.div
@@ -57,23 +62,47 @@ export default function SuccessOverlay({ order, onClose, onPrint }) {
           <div className="change"><span>Kembalian</span><span>{rupiah(order.change)}</span></div>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => onPrint(order, 'receipt')}
-        >
-          <span className="material-symbols-outlined">receipt_long</span>
-          Cetak Struk
-        </button>
+        {isRawBT ? (
+          <>
+            <a
+              href={receiptUrl}
+              className="btn btn-primary"
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              <span className="material-symbols-outlined">receipt_long</span>
+              Cetak Struk
+            </a>
 
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => onPrint(order, 'kitchen')}
-        >
-          <span className="material-symbols-outlined">print</span>
-          Cetak Tiket Dapur
-        </button>
+            <a
+              href={kitchenUrl}
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              <span className="material-symbols-outlined">print</span>
+              Cetak Tiket Dapur
+            </a>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => onPrint(order, 'receipt')}
+            >
+              <span className="material-symbols-outlined">receipt_long</span>
+              Cetak Struk
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => onPrint(order, 'kitchen')}
+            >
+              <span className="material-symbols-outlined">print</span>
+              Cetak Tiket Dapur
+            </button>
+          </>
+        )}
 
         <button type="button" className="btn btn-secondary btn-plain" onClick={onClose}>
           Selesai

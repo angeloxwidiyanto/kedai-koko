@@ -1,7 +1,7 @@
-// Builder ESC/POS untuk printer termal (80mm / Font A, lebar 42 kolom).
+// Builder ESC/POS untuk printer termal (58mm / Font A, lebar 32 kolom).
 // Semua output berupa Uint8Array perintah ESC/POS.
 
-const WIDTH = 42 // Lebar cetak thermal printer standar (42 kolom tanpa terpotong)
+const WIDTH = 32 // Lebar thermal 58mm standar (32 kolom) agar teks & harga tidak terpotong
 
 // Perintah dasar
 const ESC = 0x1b
@@ -135,7 +135,8 @@ export function kitchenTicket(order) {
   align(1)
   line('Siapkan pesanan')
   feed(1)
-  line('powered by Solvana Inovasi Digital')
+  line('powered by')
+  line('Solvana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -187,7 +188,8 @@ export function receipt(order) {
   bold(false)
   line('Terima kasih')
   feed(1)
-  line('powered by Solvana Inovasi Digital')
+  line('powered by')
+  line('Solvana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -201,7 +203,8 @@ export function testTicket() {
   line(center('Pesan ini tercetak'))
   line(center('dari aplikasi kasir.'))
   feed(1)
-  line(center('powered by Solvana Inovasi Digital'))
+  line(center('powered by'))
+  line(center('Solvana Inovasi Digital'))
   feed(3)
   cut()
   return Uint8Array.from(bytes)

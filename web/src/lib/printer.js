@@ -198,12 +198,15 @@ export function printViaRawBTWebSocket(bytes, timeoutMs = 800) {
   })
 }
 
-// Mencoba cetak melalui Intent / URL Scheme RawBT
-export function printViaRawBTIntent(bytes) {
+// Menghasilkan URL RawBT langsung dari bytes
+export function getRawBTUrl(bytes) {
   const base64 = uint8ToBase64(bytes)
-  // Format resmi RawBT untuk teks & ESC/POS adalah data:text/plain;base64,
-  // RawBT TIDAK mengenali application/octet-stream dan akan menampilkan "Empty print job" jika bukan text/plain
-  const rawbtUrl = `rawbt:data:text/plain;base64,${base64}`
+  return `rawbt:data:text/plain;base64,${base64}`
+}
+
+// Mencoba cetak melalui Intent / URL Scheme RawBT (eksekusi sinkron tanpa delay agar gesture tidak hangus)
+export function printViaRawBTIntent(bytes) {
+  const rawbtUrl = getRawBTUrl(bytes)
 
   try {
     window.location.href = rawbtUrl
@@ -221,13 +224,9 @@ export function printViaRawBTIntent(bytes) {
   return { method: 'scheme' }
 }
 
-// Pipeline utama RawBT: WebSocket first -> Fallback ke Intent
-export async function printRawBT(bytes) {
-  try {
-    return await printViaRawBTWebSocket(bytes, 700)
-  } catch {
-    return printViaRawBTIntent(bytes)
-  }
+// Pipeline utama RawBT: Panggil Intent langsung secara sinkron agar tidak diblokir browser Android
+export function printRawBT(bytes) {
+  return printViaRawBTIntent(bytes)
 }
 
 // ===== Router Cetak Terpadu =====
