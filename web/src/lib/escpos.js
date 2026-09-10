@@ -96,11 +96,9 @@ function cut() {
 
 function header(title) {
   align(1)
-  bold(true)
-  size(17) // Dobel lebar & dobel tinggi
+  size(1)
   line('KEDAI KOKO')
   size(0)
-  bold(false)
   line(title)
   align(0)
   divider()
