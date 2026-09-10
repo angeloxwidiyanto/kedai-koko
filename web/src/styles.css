@@ -2215,6 +2215,118 @@ button {
   flex: 1;
 }
 
+/* Printer Modal & Modes */
+.printer-modal-dialog {
+  max-width: 480px;
+  width: 92%;
+}
+
+.printer-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mode-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 2px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--on-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-card:hover {
+  border-color: var(--primary);
+  background: var(--surface-variant);
+}
+
+.mode-card.active {
+  border-color: var(--primary);
+  background: rgba(184, 75, 41, 0.08);
+}
+
+.mode-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.mode-card-header .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.mode-card p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  line-height: 1.4;
+}
+
+.mode-pill {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--green);
+  color: #fff;
+}
+
+.printer-mode-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.rawbt-instructions {
+  background: var(--surface-variant);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.rawbt-instructions h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.rawbt-instructions ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.form-success {
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: #e8f3e9;
+  color: var(--green);
+  font-weight: 600;
+  font-size: 13px;
+  margin: 0;
+}
+
 .printer-banner {
   position: fixed;
   right: 20px;

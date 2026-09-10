@@ -21,6 +21,7 @@ function Shell() {
   const [payOpen, setPayOpen] = useState(false)
   const [success, setSuccess] = useState(null)
   const [printState, setPrintState] = useState(null)
+  const [printMode, setPrintMode] = useState(printer.getPrintMode())
   const [toast, setToast] = useState(null)
   const [printerOpen, setPrinterOpen] = useState(false)
   const [printerConnected, setPrinterConnected] = useState(false)
@@ -57,18 +58,39 @@ function Shell() {
   }
 
   const handlePrint = useCallback(async (order, kind = 'kitchen') => {
-    if (printerConnected) {
+    const mode = printer.getPrintMode()
+    const data = kind === 'receipt' ? escpos.receipt(order) : escpos.kitchenTicket(order)
+
+    if (mode === 'rawbt') {
       try {
-        const data = kind === 'receipt' ? escpos.receipt(order) : escpos.kitchenTicket(order)
-        await printer.print(data)
-        showToast('Tercetak')
-      } catch {
-        setPrintState({ order, kind }) // fallback browser print
+        const res = await printer.printRawBT(data)
+        if (res?.method === 'websocket') {
+          showToast('Tercetak (RawBT WebSocket)')
+        } else {
+          showToast('Terkirim ke RawBT')
+        }
+      } catch (err) {
+        showToast('Gagal kirim ke RawBT: ' + (err.message || 'error'))
       }
       return
     }
+
+    if (mode === 'webusb') {
+      if (printerConnected) {
+        try {
+          await printer.print(data)
+          showToast('Tercetak (USB)')
+        } catch {
+          setPrintState({ order, kind })
+        }
+        return
+      }
+      setPrintState({ order, kind })
+      return
+    }
+
     setPrintState({ order, kind })
-  }, [printerConnected])
+  }, [printerConnected, showToast])
 
   useEffect(() => {
     if (!printState) return
@@ -85,9 +107,13 @@ function Shell() {
   }, [printState])
 
   useEffect(() => {
-    const unsub = printer.subscribe((dev) => setPrinterConnected(!!dev))
-    if (printer.isSupported()) printer.autoReconnect()
-    return unsub
+    const unsubDev = printer.subscribe((dev) => setPrinterConnected(!!dev))
+    const unsubMode = printer.subscribeMode((m) => setPrintMode(m))
+    if (printer.isWebUsbSupported()) printer.autoReconnect()
+    return () => {
+      unsubDev()
+      unsubMode()
+    }
   }, [])
 
   function handleCartClick() {
@@ -114,14 +140,14 @@ function Shell() {
 
       <TopNav page={page} onNav={setPage} onCart={handleCartClick} onPrinter={() => setPrinterOpen(true)} />
 
-      {printer.isSupported() && !printerConnected && !authRequired && (
+      {printMode === 'webusb' && printer.isWebUsbSupported() && !printerConnected && !authRequired && (
         <button
           type="button"
           className="printer-banner"
           onClick={() => setPrinterOpen(true)}
         >
           <span className="material-symbols-outlined">print</span>
-          Sambungkan printer
+          Sambungkan printer USB
         </button>
       )}
 
