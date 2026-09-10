@@ -1,8 +1,6 @@
 // Builder ESC/POS untuk printer termal (80mm / Font A, lebar 42 kolom).
 // Semua output berupa Uint8Array perintah ESC/POS.
 
-import { LOGO_RASTER_B64 } from './logo_raster'
-
 const WIDTH = 42 // Lebar cetak thermal printer standar (42 kolom tanpa terpotong)
 
 // Perintah dasar
@@ -96,26 +94,13 @@ function cut() {
   push(GS, 0x56, 66, 0) // GS V B 0 (partial cut)
 }
 
-function printLogo() {
-  if (!LOGO_RASTER_B64) return
+function header(title) {
   align(1)
-  const binary = atob(LOGO_RASTER_B64)
-  for (let i = 0; i < binary.length; i++) {
-    push(binary.charCodeAt(i) & 0xff)
-  }
-  push(0x0a) // LF
-}
-
-function header(title, withLogo = false) {
-  align(1)
-  if (withLogo) {
-    printLogo()
-    feed(1)
-  } else {
-    size(1)
-    line('KEDAI KOKO')
-  }
+  bold(true)
+  size(17) // Dobel lebar & dobel tinggi
+  line('KEDAI KOKO')
   size(0)
+  bold(false)
   line(title)
   align(0)
   divider()
@@ -124,7 +109,7 @@ function header(title, withLogo = false) {
 // Tiket dapur
 export function kitchenTicket(order) {
   init()
-  header('TIKET DAPUR', false)
+  header('TIKET DAPUR')
 
   const rows = [
     ['No.', order.number],
@@ -159,7 +144,7 @@ export function kitchenTicket(order) {
 // Struk pembayaran
 export function receipt(order) {
   init()
-  header('STRUK PEMBAYARAN', true)
+  header('STRUK PEMBAYARAN')
 
   const rows = [
     ['No.', order.number],
@@ -211,7 +196,7 @@ export function receipt(order) {
 // Uji cetak
 export function testTicket() {
   init()
-  header('TEST PRINTER', true)
+  header('TEST PRINTER')
   line(center('Test Printer OK'))
   line(center('Pesan ini tercetak'))
   line(center('dari aplikasi kasir.'))
