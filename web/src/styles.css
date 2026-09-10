@@ -1459,6 +1459,12 @@ button {
     font-size: 13px;
     line-height: 1.4;
   }
+  .pt-logo-img {
+    max-width: 130px;
+    height: auto;
+    margin: 0 auto 6px;
+    display: block;
+  }
   .pt-brand {
     font-size: 22px;
     font-weight: 800;

@@ -1,6 +1,8 @@
 // Builder ESC/POS untuk printer termal (80mm / Font A, lebar 42 kolom).
 // Semua output berupa Uint8Array perintah ESC/POS.
 
+import { LOGO_RASTER_B64 } from './logo_raster'
+
 const WIDTH = 42 // Lebar cetak thermal printer standar (42 kolom tanpa terpotong)
 
 // Perintah dasar
@@ -94,10 +96,25 @@ function cut() {
   push(GS, 0x56, 66, 0) // GS V B 0 (partial cut)
 }
 
-function header(title) {
+function printLogo() {
+  if (!LOGO_RASTER_B64) return
   align(1)
-  size(1)
-  line('KEDAI KOKO')
+  const binary = atob(LOGO_RASTER_B64)
+  for (let i = 0; i < binary.length; i++) {
+    push(binary.charCodeAt(i) & 0xff)
+  }
+  push(0x0a) // LF
+}
+
+function header(title, withLogo = false) {
+  align(1)
+  if (withLogo) {
+    printLogo()
+    feed(1)
+  } else {
+    size(1)
+    line('KEDAI KOKO')
+  }
   size(0)
   line(title)
   align(0)
@@ -107,7 +124,7 @@ function header(title) {
 // Tiket dapur
 export function kitchenTicket(order) {
   init()
-  header('TIKET DAPUR')
+  header('TIKET DAPUR', false)
 
   const rows = [
     ['No.', order.number],
@@ -133,7 +150,7 @@ export function kitchenTicket(order) {
   align(1)
   line('Siapkan pesanan')
   feed(1)
-  line('powered by Slovana Inovasi Digital')
+  line('powered by Solvana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -142,7 +159,7 @@ export function kitchenTicket(order) {
 // Struk pembayaran
 export function receipt(order) {
   init()
-  header('STRUK PEMBAYARAN')
+  header('STRUK PEMBAYARAN', true)
 
   const rows = [
     ['No.', order.number],
@@ -185,7 +202,7 @@ export function receipt(order) {
   bold(false)
   line('Terima kasih')
   feed(1)
-  line('powered by Slovana Inovasi Digital')
+  line('powered by Solvana Inovasi Digital')
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -194,16 +211,12 @@ export function receipt(order) {
 // Uji cetak
 export function testTicket() {
   init()
-  align(1)
-  size(1)
-  line('KEDAI KOKO')
-  size(0)
-  divider()
+  header('TEST PRINTER', true)
   line(center('Test Printer OK'))
   line(center('Pesan ini tercetak'))
   line(center('dari aplikasi kasir.'))
   feed(1)
-  line(center('powered by Slovana Inovasi Digital'))
+  line(center('powered by Solvana Inovasi Digital'))
   feed(3)
   cut()
   return Uint8Array.from(bytes)
@@ -212,4 +225,5 @@ export function testTicket() {
 function rupiah(n) {
   return 'Rp' + Number(n || 0).toLocaleString('id-ID')
 }
+
 
