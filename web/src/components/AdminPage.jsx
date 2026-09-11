@@ -147,7 +147,7 @@ function ReportsView() {
         </div>
         <button
           type="button"
-          className="btn btn-dark btn-sm"
+          className="btn btn-dark btn-sm report-download-btn"
           onClick={download}
           disabled={downloading}
         >
@@ -294,10 +294,12 @@ function ReportsView() {
 function StatCard({ icon, label, value }) {
   return (
     <div className="stat-card">
-      <span className="stat-icon"><span className="material-symbols-outlined">{icon}</span></span>
-      <div>
+      <span className="stat-icon" aria-hidden="true">
+        <span className="material-symbols-outlined">{icon}</span>
+      </span>
+      <div className="stat-info">
         <span className="stat-label">{label}</span>
-        <span className="stat-value">{value}</span>
+        <span className="stat-value" title={value}>{value}</span>
       </div>
     </div>
   )

@@ -1810,32 +1810,46 @@ button {
 }
 .admin-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: var(--stack-md);
-  border-bottom: 3px solid var(--on-bg);
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: var(--stack-lg);
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--outline-variant);
 }
 .admin-tab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: var(--touch);
-  padding: 0 20px;
-  border: none;
-  background: transparent;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 2px solid var(--outline-variant);
+  border-radius: var(--r-full);
+  background: var(--surface-lowest);
   color: var(--on-surface-variant);
   font-size: var(--fs-label-lg);
   font-weight: 700;
   cursor: pointer;
-  border-bottom: 4px solid transparent;
-  margin-bottom: -3px;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.admin-tab:hover {
+  background: var(--surface-low);
+  border-color: var(--on-bg);
+  color: var(--on-bg);
 }
 .admin-tab.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--on-bg);
+  box-shadow: 0 3px 0 var(--on-bg);
+  transform: translateY(-1px);
+}
+.admin-tab:focus-visible {
+  outline: 3px solid var(--on-bg);
+  outline-offset: 2px;
 }
 .admin-tab .material-symbols-outlined {
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .btn-sm {
@@ -1860,68 +1874,104 @@ button {
 .report-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 16px;
-  padding: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
   background: var(--surface-lowest);
   border: 2px solid var(--on-bg);
   border-radius: var(--r-lg);
+  box-shadow: 0 2px 0 var(--on-bg);
 }
 .range-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-end;
 }
 .range-controls label {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface-variant);
 }
 .range-controls input {
   min-height: 44px;
-  padding: 0 10px;
-  border: 3px solid var(--on-bg);
-  border-radius: var(--r-sm);
+  padding: 0 12px;
+  border: 2px solid var(--on-bg);
+  border-radius: var(--r-md);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
   background: var(--surface-lowest);
+  color: var(--on-bg);
 }
 .range-controls input:focus {
   border-color: var(--primary);
   outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
 }
 .quick-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  align-items: flex-end;
+  align-items: center;
 }
 .quick-controls .chip {
   min-height: 44px;
   padding: 0 16px;
+  font-weight: 700;
+}
+.report-download-btn {
+  margin-left: auto;
+}
+@media (max-width: 768px) {
+  .report-download-btn {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+@media (min-width: 600px) and (max-width: 920px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 921px) {
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  }
 }
 .stat-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px;
+  padding: 16px 18px;
   background: var(--surface-lowest);
   border: 2px solid var(--on-bg);
   border-radius: var(--r-lg);
+  box-shadow: 0 2px 0 var(--on-bg);
+  min-width: 0;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--on-bg);
 }
 .stat-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
   border-radius: var(--r-md);
   background: var(--primary);
@@ -1929,19 +1979,35 @@ button {
   border: 2px solid var(--on-bg);
 }
 .stat-icon .material-symbols-outlined {
-  font-size: 28px;
+  font-size: 24px;
+}
+.stat-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 .stat-label {
   display: block;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--on-surface-variant);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat-value {
   display: block;
-  font-size: var(--fs-headline-lg);
+  font-size: clamp(19px, 2vw, 24px);
   font-weight: 800;
   color: var(--on-bg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
 }
 
 .admin-panel {
@@ -1949,6 +2015,7 @@ button {
   background: var(--surface-lowest);
   border: 2px solid var(--on-bg);
   border-radius: var(--r-lg);
+  box-shadow: 0 2px 0 var(--on-bg);
 }
 .admin-panel h3 {
   font-size: var(--fs-headline-md);
