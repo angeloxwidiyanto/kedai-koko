@@ -119,7 +119,7 @@ export default function PaymentModal({ onClose, onDone }) {
 
         <div className="modal-items">
           {cartItems.map((item) => (
-            <div key={item.id} className="pay-item">
+            <div key={item.cartItemId || item.id} className="pay-item">
               <span className="pay-emoji" style={{ background: item.color }} aria-hidden="true">
                 {item.emoji}
               </span>

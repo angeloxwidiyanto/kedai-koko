@@ -11,7 +11,19 @@ function loadCart() {
     const raw = localStorage.getItem(CART_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    if (!parsed || typeof parsed !== 'object') return {}
+    const normalized = {}
+    for (const [key, val] of Object.entries(parsed)) {
+      if (!val || typeof val !== 'object') continue
+      const cartItemId = val.cartItemId || key
+      const productId = val.productId || key
+      const qty = Number(val.qty) || 0
+      const note = String(val.note || '')
+      if (qty > 0) {
+        normalized[cartItemId] = { cartItemId, productId, qty, note }
+      }
+    }
+    return normalized
   } catch {
     return {}
   }
@@ -106,29 +118,89 @@ export function ShopProvider({ children }) {
   const role = user?.role || null
   const roleLabel = role === 'admin' ? 'Admin' : 'Kasir'
 
-  const add = useCallback((id) => {
+  const add = useCallback((productId) => {
     setCart((prev) => {
-      const cur = prev[id] || { qty: 0, note: '' }
-      return { ...prev, [id]: { qty: cur.qty + 1, note: cur.note } }
+      // Cari apakah ada baris produk ini yang catatannya MASIH KOSONG
+      const emptyNoteEntry = Object.values(prev).find(
+        (it) => it.productId === productId && !it.note
+      )
+      if (emptyNoteEntry) {
+        return {
+          ...prev,
+          [emptyNoteEntry.cartItemId]: {
+            ...emptyNoteEntry,
+            qty: emptyNoteEntry.qty + 1,
+          },
+        }
+      }
+      // Jika semua baris sudah ada catatan atau belum ada, buat baris baru
+      const cartItemId = `${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      return {
+        ...prev,
+        [cartItemId]: {
+          cartItemId,
+          productId,
+          qty: 1,
+          note: '',
+        },
+      }
     })
   }, [])
 
-  const remove = useCallback((id) => {
+  const remove = useCallback((productId) => {
     setCart((prev) => {
-      const cur = prev[id]
-      if (!cur) return prev
+      const matching = Object.values(prev).filter((it) => it.productId === productId)
+      if (matching.length === 0) return prev
+      // Kurangi baris yang belum memiliki catatan terlebih dahulu, atau baris terakhir
+      const target = matching.find((it) => !it.note) || matching[matching.length - 1]
       const next = { ...prev }
-      const qty = cur.qty - 1
-      if (qty <= 0) delete next[id]
-      else next[id] = { ...cur, qty }
+      if (target.qty <= 1) {
+        delete next[target.cartItemId]
+      } else {
+        next[target.cartItemId] = { ...target, qty: target.qty - 1 }
+      }
       return next
     })
   }, [])
 
-  const setNote = useCallback((id, note) => {
+  // Modifikasi kuantitas spesifik per baris di keranjang
+  const updateQty = useCallback((cartItemId, delta) => {
     setCart((prev) => {
-      if (!prev[id]) return prev
-      return { ...prev, [id]: { ...prev[id], note } }
+      const cur = prev[cartItemId]
+      if (!cur) return prev
+      const next = { ...prev }
+      const newQty = cur.qty + delta
+      if (newQty <= 0) {
+        delete next[cartItemId]
+      } else {
+        next[cartItemId] = { ...cur, qty: newQty }
+      }
+      return next
+    })
+  }, [])
+
+  // Memecah 1 porsi dari baris yang ada menjadi baris baru untuk catatan berbeda
+  const splitItem = useCallback((cartItemId) => {
+    setCart((prev) => {
+      const cur = prev[cartItemId]
+      if (!cur || cur.qty <= 1) return prev
+      const next = { ...prev }
+      next[cartItemId] = { ...cur, qty: cur.qty - 1 }
+      const newId = `${cur.productId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      next[newId] = {
+        cartItemId: newId,
+        productId: cur.productId,
+        qty: 1,
+        note: '',
+      }
+      return next
+    })
+  }, [])
+
+  const setNote = useCallback((cartItemId, note) => {
+    setCart((prev) => {
+      if (!prev[cartItemId]) return prev
+      return { ...prev, [cartItemId]: { ...prev[cartItemId], note } }
     })
   }, [])
 
@@ -138,13 +210,28 @@ export function ShopProvider({ children }) {
     setTableNo('')
   }, [])
 
-  const cartItems = useMemo(
-    () =>
-      products
-        .filter((p) => (cart[p.id]?.qty || 0) > 0)
-        .map((p) => ({ ...p, qty: cart[p.id].qty, note: cart[p.id].note || '' })),
-    [products, cart]
+  const getProductQty = useCallback(
+    (productId) =>
+      Object.values(cart)
+        .filter((it) => it.productId === productId)
+        .reduce((sum, it) => sum + it.qty, 0),
+    [cart]
   )
+
+  const cartItems = useMemo(() => {
+    const pMap = new Map(products.map((p) => [p.id, p]))
+    return Object.values(cart)
+      .filter((it) => it.qty > 0 && pMap.has(it.productId))
+      .map((it) => {
+        const p = pMap.get(it.productId)
+        return {
+          ...p,
+          cartItemId: it.cartItemId,
+          qty: it.qty,
+          note: it.note || '',
+        }
+      })
+  }, [products, cart])
 
   const count = useMemo(() => cartItems.reduce((s, i) => s + i.qty, 0), [cartItems])
   const subtotal = useMemo(() => cartItems.reduce((s, i) => s + i.qty * i.price, 0), [cartItems])
@@ -163,7 +250,10 @@ export function ShopProvider({ children }) {
     cart,
     add,
     remove,
+    updateQty,
+    splitItem,
     setNote,
+    getProductQty,
     clear,
     orderType,
     setOrderType,

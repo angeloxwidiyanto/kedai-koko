@@ -791,6 +791,38 @@ button {
   text-align: center;
   font-weight: 700;
 }
+.cart-controls-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
+.split-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  min-height: 30px;
+  background: var(--surface-highest);
+  border: 1.5px dashed var(--primary);
+  border-radius: var(--r-full);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.split-btn:hover {
+  background: var(--primary-fixed);
+  border-style: solid;
+}
+.split-btn:active {
+  transform: scale(0.96);
+}
+.split-btn .material-symbols-outlined {
+  font-size: 16px;
+}
 .cart-line-total {
   font-weight: 700;
   white-space: nowrap;

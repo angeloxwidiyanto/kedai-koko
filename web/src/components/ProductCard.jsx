@@ -3,8 +3,8 @@ import { useShop } from '../shop'
 import { rupiah } from '../lib/format'
 
 export default function ProductCard({ product, index, onAdd }) {
-  const { cart, add, remove } = useShop()
-  const qty = cart[product.id]?.qty || 0
+  const { add, remove, getProductQty } = useShop()
+  const qty = getProductQty ? getProductQty(product.id) : 0
   const isBest = (product.tags || []).includes('Best Seller')
   const otherTags = (product.tags || []).filter((t) => t !== 'Best Seller').slice(0, 2)
   const soldOut = !product.available

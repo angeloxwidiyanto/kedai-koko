@@ -9,6 +9,7 @@ function NoteEditor({ item }) {
   const { setNote } = useShop()
   const [open, setOpen] = useState(false)
   const note = item.note || ''
+  const itemId = item.cartItemId || item.id
 
   if (!open) {
     return (
@@ -31,7 +32,7 @@ function NoteEditor({ item }) {
             key={p}
             type="button"
             className={`note-chip ${note === p ? 'active' : ''}`}
-            onClick={() => setNote(item.id, note === p ? '' : p)}
+            onClick={() => setNote(itemId, note === p ? '' : p)}
           >
             {p}
           </button>
@@ -40,9 +41,10 @@ function NoteEditor({ item }) {
       <input
         className="note-input"
         value={note}
-        onChange={(e) => setNote(item.id, e.target.value)}
+        onChange={(e) => setNote(itemId, e.target.value)}
         placeholder="Contoh: tanpa gula, tanpa es"
         aria-label="Catatan pesanan"
+        autoFocus
       />
       <div className="note-actions">
         <button type="button" className="note-done" onClick={() => setOpen(false)}>
@@ -54,7 +56,7 @@ function NoteEditor({ item }) {
 }
 
 export default function CartPanel({ onCheckout }) {
-  const { cartItems, count, subtotal, add, remove } = useShop()
+  const { cartItems, count, subtotal, updateQty, splitItem } = useShop()
 
   return (
     <aside className="cart-panel">
@@ -73,7 +75,7 @@ export default function CartPanel({ onCheckout }) {
           <AnimatePresence initial={false}>
             {cartItems.map((item) => (
               <motion.div
-                key={item.id}
+                key={item.cartItemId || item.id}
                 layout
                 className="cart-item"
                 initial={{ opacity: 0, x: 20 }}
@@ -86,14 +88,36 @@ export default function CartPanel({ onCheckout }) {
                 <div className="cart-info">
                   <h4>{item.name}</h4>
                   <span className="cart-price">{rupiah(item.price)}</span>
-                  <div className="mini-stepper">
-                    <button type="button" onClick={() => remove(item.id)} aria-label="Kurangi">
-                      <span className="material-symbols-outlined">remove</span>
-                    </button>
-                    <span>{item.qty}</span>
-                    <button type="button" onClick={() => add(item.id)} aria-label="Tambah">
-                      <span className="material-symbols-outlined">add</span>
-                    </button>
+                  <div className="cart-controls-row">
+                    <div className="mini-stepper">
+                      <button
+                        type="button"
+                        onClick={() => updateQty(item.cartItemId, -1)}
+                        aria-label="Kurangi"
+                      >
+                        <span className="material-symbols-outlined">remove</span>
+                      </button>
+                      <span>{item.qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQty(item.cartItemId, 1)}
+                        aria-label="Tambah"
+                      >
+                        <span className="material-symbols-outlined">add</span>
+                      </button>
+                    </div>
+
+                    {item.qty > 1 && (
+                      <button
+                        type="button"
+                        className="split-btn"
+                        onClick={() => splitItem(item.cartItemId)}
+                        title="Pisahkan 1 porsi untuk varian atau catatan berbeda"
+                      >
+                        <span className="material-symbols-outlined">call_split</span>
+                        <span>Pisah catatan</span>
+                      </button>
+                    )}
                   </div>
                   <NoteEditor item={item} />
                 </div>
