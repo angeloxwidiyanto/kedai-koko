@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useShop } from '../shop'
 
@@ -12,11 +13,36 @@ const ADMIN_NAV = [{ id: 'admin', label: 'Admin', icon: 'dashboard' }]
 export default function TopNav({ page, onNav, onCart, onPrinter }) {
   const { count, role, user, logout } = useShop()
   const items = role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV
+  const [installPrompt, setInstallPrompt] = useState(null)
+
+  useEffect(() => {
+    const isStandalone =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone)
+    if (isStandalone) return
+
+    const handlePrompt = (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+    }
+
+    window.addEventListener('beforeinstallprompt', handlePrompt)
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt)
+  }, [])
+
+  async function handleInstall() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') {
+      setInstallPrompt(null)
+    }
+  }
 
   return (
     <header className="topnav">
       <div className="brand">
-        <span className="logo" aria-hidden="true">KK</span>
+        <img src="/pwa-192x192.png" alt="Kedai Koko" className="nav-logo-img" />
         <span className="brand-name">Kedai Koko</span>
       </div>
 
@@ -35,6 +61,17 @@ export default function TopNav({ page, onNav, onCart, onPrinter }) {
       </nav>
 
       <div className="nav-actions">
+        {installPrompt && (
+          <button
+            type="button"
+            className="btn btn-secondary install-app-btn"
+            onClick={handleInstall}
+            title="Pasang aplikasi ke layar tablet"
+          >
+            <span className="material-symbols-outlined">install_mobile</span>
+            <span className="install-label">Pasang App</span>
+          </button>
+        )}
         <button
           type="button"
           className="icon-btn"

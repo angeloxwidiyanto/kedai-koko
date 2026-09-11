@@ -232,6 +232,14 @@ button {
   align-items: center;
   gap: 12px;
 }
+.nav-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  object-fit: cover;
+  border: 2px solid var(--on-bg);
+  box-shadow: 0 2px 4px rgba(37, 25, 19, 0.1);
+}
 .logo {
   display: grid;
   place-items: center;
@@ -252,6 +260,31 @@ button {
 }
 @media (max-width: 640px) {
   .brand-name {
+    display: none;
+  }
+}
+
+.install-app-btn {
+  min-height: 40px;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--r-full);
+  background: var(--primary-fixed);
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.install-app-btn:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.install-app-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+@media (max-width: 640px) {
+  .install-app-btn .install-label {
     display: none;
   }
 }
