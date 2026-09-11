@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "go",
-  "buildCommand": "cd web && npm install && npm run build && cd .. && go build -tags embed -o bin/server ./cmd/server"
+  "buildCommand": "cd web && npm install && npm run build && cd .. && go build -tags embed -o bin/server ./cmd/server",
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }

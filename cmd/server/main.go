@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"kedaikoko/internal/httpapi"
 	"kedaikoko/internal/store"
@@ -41,6 +42,19 @@ func main() {
 		log.Fatalf("gagal inisialisasi penyimpanan: %v", err)
 	}
 	log.Printf("Penyimpanan: %s", driver)
+
+	// Keep-alive otomatis: ping database berkala agar Supabase free tier tidak tidur/pause
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := store.Default.Ping(); err != nil {
+				log.Printf("[keep-alive] ping database: %v", err)
+			} else {
+				log.Println("[keep-alive] database ping ok (Supabase tetap aktif)")
+			}
+		}
+	}()
 
 	if os.Getenv("AUTH_SECRET") == "" {
 		log.Println("PERINGATAN: AUTH_SECRET tidak diset — memakai secret default (hanya untuk dev).")
