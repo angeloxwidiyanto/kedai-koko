@@ -1,3 +1,5 @@
+import { saveOfflineOrder } from './offlineSync'
+
 let token = sessionStorage.getItem('kk-token') || ''
 
 export function setAuthToken(t) {
@@ -84,7 +86,39 @@ export function getOrders() {
   return fetch('/api/orders', { headers: headers() }).then(json)
 }
 
-export function createOrder(payload) {
+export async function createOrder(payload, options = {}) {
+  const { cashier, products } = options
+
+  // Jika browser offline, langsung simpan secara lokal
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return saveOfflineOrder(payload, cashier, products)
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 4500)
+
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return await json(res)
+  } catch (err) {
+    clearTimeout(timeoutId)
+    // Jika error validasi bisnis dari server (400, 401, 422), jangan simpan offline
+    if (err.status && err.status >= 400 && err.status < 500) {
+      throw err
+    }
+    // Jika network error / timeout, simpan ke antrean offline
+    console.warn('[api] Gagal terhubung ke cloud/server, menyimpan pesanan secara offline...', err)
+    return saveOfflineOrder(payload, cashier, products)
+  }
+}
+
+export function syncOrderToServer(payload) {
   return fetch('/api/orders', {
     method: 'POST',
     headers: headers(),

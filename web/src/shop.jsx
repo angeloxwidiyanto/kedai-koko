@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin } from './lib/api'
+import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin, syncOrderToServer } from './lib/api'
+import {
+  cacheCatalog,
+  getCachedCatalog,
+  getPendingCount,
+  syncPendingOrders,
+  subscribeSync,
+} from './lib/offlineSync'
 
 const ShopContext = createContext(null)
 
@@ -40,6 +47,11 @@ export function ShopProvider({ children }) {
   const [cart, setCart] = useState(loadCart)
   const [orderType, setOrderType] = useState(null)
   const [tableNo, setTableNo] = useState('')
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
+  const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const idleTimer = useRef(null)
 
@@ -50,6 +62,57 @@ export function ShopProvider({ children }) {
       /* ignore */
     }
   }, [cart])
+
+  // Sync count listener
+  useEffect(() => {
+    getPendingCount().then(setPendingSyncCount)
+    const unsub = subscribeSync(() => {
+      getPendingCount().then(setPendingSyncCount)
+    })
+    return unsub
+  }, [])
+
+  const triggerSyncNow = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { error: 'Sedang offline' }
+    }
+    setIsSyncing(true)
+    try {
+      return await syncPendingOrders(syncOrderToServer)
+    } finally {
+      setIsSyncing(false)
+      getPendingCount().then(setPendingSyncCount)
+    }
+  }, [])
+
+  // Auto-sync listener saat online kembali
+  useEffect(() => {
+    function handleOnline() {
+      setIsOnline(true)
+      triggerSyncNow()
+    }
+    function handleOffline() {
+      setIsOnline(false)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        getPendingCount().then((cnt) => {
+          setPendingSyncCount(cnt)
+          if (cnt > 0) triggerSyncNow()
+        })
+      }
+    }, 20000)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      clearInterval(interval)
+    }
+  }, [triggerSyncNow])
 
   useEffect(() => {
     if (!hasAuthToken()) {
@@ -68,11 +131,25 @@ export function ShopProvider({ children }) {
         setCategories(c)
         setUser(me)
         setAuthRequired(false)
+        cacheCatalog(p, c, me)
       })
-      .catch((e) => {
+      .catch(async (e) => {
         if (!active) return
-        if (e.status === 401) setAuthRequired(true)
-        else setError(e.message)
+        if (e.status === 401) {
+          setAuthRequired(true)
+          return
+        }
+        // Fallback offline: gunakan data katalog dari cache IndexedDB
+        const cached = await getCachedCatalog()
+        if (cached.products && cached.products.length > 0) {
+          setProducts(cached.products)
+          setCategories(cached.categories || [])
+          if (cached.user) setUser(cached.user)
+          setAuthRequired(false)
+          setError(null)
+        } else {
+          setError(e.message)
+        }
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -262,6 +339,10 @@ export function ShopProvider({ children }) {
     cartItems,
     count,
     subtotal,
+    isOnline,
+    pendingSyncCount,
+    isSyncing,
+    triggerSyncNow,
   }
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>

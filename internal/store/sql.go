@@ -683,6 +683,20 @@ func scanOrder(row pgx.Row) (model.Order, error) {
 func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User) (model.Order, error) {
 	ctx := context.Background()
 
+	if req.ClientOrderID != "" {
+		var existingID string
+		if err := s.pool.QueryRow(ctx, `SELECT id FROM orders WHERE id=$1`, req.ClientOrderID).Scan(&existingID); err == nil {
+			o, err := scanOrder(s.pool.QueryRow(ctx, `SELECT `+orderCols+` FROM orders WHERE id=$1`, req.ClientOrderID))
+			if err == nil {
+				items, err := s.loadItems(ctx, []string{req.ClientOrderID})
+				if err == nil {
+					o.Items = items[req.ClientOrderID]
+					return o, nil
+				}
+			}
+		}
+	}
+
 	if len(req.Items) == 0 {
 		return model.Order{}, ErrEmptyOrder
 	}
@@ -817,8 +831,14 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		return model.Order{}, err
 	}
 
-	id := fmt.Sprintf("ord-%d", time.Now().UnixNano())
+	id := req.ClientOrderID
+	if id == "" {
+		id = fmt.Sprintf("ord-%d", time.Now().UnixNano())
+	}
 	now := time.Now()
+	if req.CreatedAt != nil && !req.CreatedAt.IsZero() {
+		now = *req.CreatedAt
+	}
 
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO orders (id, number, order_type, table_no, subtotal, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)

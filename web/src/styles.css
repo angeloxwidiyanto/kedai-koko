@@ -1773,6 +1773,100 @@ button {
   }
 }
 
+/* Connection & Offline Sync Chips in TopNav */
+.connection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  min-height: 40px;
+  border-radius: var(--r-full);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.connection-chip.online {
+  background: var(--surface-low);
+  color: var(--on-surface-variant);
+  border-color: var(--outline-variant);
+}
+.connection-chip.offline {
+  background: #fef08a;
+  color: #854d0e;
+  border-color: #eab308;
+}
+.connection-chip.sync-pending {
+  background: #ffedd5;
+  color: var(--primary);
+  border-color: var(--primary);
+  cursor: pointer;
+}
+.connection-chip.sync-pending:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.connection-chip.sync-pending.syncing .sync-icon {
+  animation: spin-sync 1s linear infinite;
+}
+@keyframes spin-sync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  flex-shrink: 0;
+}
+.dot-online {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}
+.dot-offline {
+  background: #ca8a04;
+  box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.2);
+}
+
+.badge-offline-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: #fef08a;
+  color: #854d0e;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid #eab308;
+  vertical-align: middle;
+}
+
+.offline-notice {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fef08a;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  text-align: center;
+}
+
+/* History Page Offline Orders */
+.order-card.order-offline {
+  border: 2px dashed #f59e0b;
+  background: #fffdfa;
+}
+.order-status.status-offline {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #f59e0b;
+}
+
 /* ===== Product card image & sold out ===== */
 .card-img {
   position: absolute;

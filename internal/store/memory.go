@@ -405,6 +405,14 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if req.ClientOrderID != "" {
+		for _, o := range s.orders {
+			if o.ID == req.ClientOrderID {
+				return o, nil
+			}
+		}
+	}
+
 	if len(req.Items) == 0 {
 		return model.Order{}, ErrEmptyOrder
 	}
@@ -487,9 +495,16 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	}
 
 	s.counter++
+	id := req.ClientOrderID
+	if id == "" {
+		id = fmt.Sprintf("ord-%d", time.Now().UnixNano())
+	}
 	now := time.Now()
+	if req.CreatedAt != nil && !req.CreatedAt.IsZero() {
+		now = *req.CreatedAt
+	}
 	order := model.Order{
-		ID:             fmt.Sprintf("ord-%d", time.Now().UnixNano()),
+		ID:             id,
 		Number:         fmt.Sprintf("KK-%04d", s.counter),
 		OrderType:      req.OrderType,
 		TableNo:        req.TableNo,

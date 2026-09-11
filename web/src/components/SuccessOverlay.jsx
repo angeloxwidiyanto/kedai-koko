@@ -53,7 +53,15 @@ export default function SuccessOverlay({ order, onClose, onPrint }) {
           <span className="material-symbols-outlined">check</span>
         </motion.div>
         <h2>Terima kasih!</h2>
-        <p className="order-no">Nomor pesanan {order.number}</p>
+        <p className="order-no">
+          Nomor pesanan {order.number}
+          {order.isOffline && <span className="badge-offline-chip">Offline</span>}
+        </p>
+        {order.isOffline && (
+          <p className="offline-notice">
+            Transaksi tersimpan di tablet. Otomatis disinkronkan ke server saat online.
+          </p>
+        )}
 
         <div className="receipt">
           <div><span>Total</span><span>{rupiah(order.total)}</span></div>

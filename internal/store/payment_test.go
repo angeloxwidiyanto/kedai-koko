@@ -73,3 +73,42 @@ func TestReportByPaymentMethod(t *testing.T) {
 		t.Fatalf("byPaymentMethod wrong: %+v", r.ByPaymentMethod)
 	}
 }
+
+func TestClientOrderIDSyncIdempotency(t *testing.T) {
+	s := newTestStore()
+	customTime := time.Date(2026, 9, 10, 14, 30, 0, 0, time.UTC)
+	clientOrderID := "off-ord-12345-abc"
+
+	req := model.CreateOrderRequest{
+		ClientOrderID: clientOrderID,
+		CreatedAt:     &customTime,
+		Items:         []model.OrderItemInput{itemReq("rice-1", 1, "pedas")},
+		Paid:          30000,
+		PaymentMethod: "tunai",
+		OrderType:     "take_away",
+	}
+
+	o1, err := s.CreateOrder(req, testAdmin())
+	if err != nil {
+		t.Fatalf("first create order failed: %v", err)
+	}
+	if o1.ID != clientOrderID {
+		t.Fatalf("expected order ID %s, got %s", clientOrderID, o1.ID)
+	}
+	if !o1.CreatedAt.Equal(customTime) {
+		t.Fatalf("expected created at %v, got %v", customTime, o1.CreatedAt)
+	}
+
+	// Retry request with same ClientOrderID (idempotency simulation)
+	o2, err := s.CreateOrder(req, testAdmin())
+	if err != nil {
+		t.Fatalf("second create order (retry) failed: %v", err)
+	}
+	if o2.ID != o1.ID {
+		t.Fatalf("idempotent ID mismatch: %s vs %s", o1.ID, o2.ID)
+	}
+	if o2.Number != o1.Number {
+		t.Fatalf("idempotent number mismatch: %s vs %s", o1.Number, o2.Number)
+	}
+}
+

@@ -13,7 +13,7 @@ const QUICK = [
 ]
 
 export default function PaymentModal({ onClose, onDone }) {
-  const { cartItems, subtotal, clear, orderType, tableNo } = useShop()
+  const { cartItems, subtotal, clear, orderType, tableNo, user, products } = useShop()
   const [discType, setDiscType] = useState('')
   const [discValue, setDiscValue] = useState(0)
   const [paid, setPaid] = useState(subtotal)
@@ -57,15 +57,18 @@ export default function PaymentModal({ onClose, onDone }) {
     setSaving(true)
     setErr(null)
     try {
-      const order = await createOrder({
-        items: cartItems.map((i) => ({ productId: i.id, qty: i.qty, note: i.note || '' })),
-        paid,
-        paymentMethod: payMethod,
-        orderType,
-        tableNo: orderType === 'dine_in' ? tableNo.trim() : '',
-        discountType: discType || '',
-        discountValue: discValue || 0,
-      })
+      const order = await createOrder(
+        {
+          items: cartItems.map((i) => ({ productId: i.id, qty: i.qty, note: i.note || '' })),
+          paid,
+          paymentMethod: payMethod,
+          orderType,
+          tableNo: orderType === 'dine_in' ? tableNo.trim() : '',
+          discountType: discType || '',
+          discountValue: discValue || 0,
+        },
+        { cashier: user, products }
+      )
       clear()
       onDone(order)
     } catch (e) {

@@ -11,7 +11,16 @@ const NAV = [
 const ADMIN_NAV = [{ id: 'admin', label: 'Admin', icon: 'dashboard' }]
 
 export default function TopNav({ page, onNav, onCart, onPrinter }) {
-  const { count, role, user, logout } = useShop()
+  const {
+    count,
+    role,
+    user,
+    logout,
+    isOnline,
+    pendingSyncCount,
+    isSyncing,
+    triggerSyncNow,
+  } = useShop()
   const items = role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV
   const [installPrompt, setInstallPrompt] = useState(null)
 
@@ -61,6 +70,31 @@ export default function TopNav({ page, onNav, onCart, onPrinter }) {
       </nav>
 
       <div className="nav-actions">
+        {pendingSyncCount > 0 && (
+          <button
+            type="button"
+            className={`connection-chip sync-pending ${isSyncing ? 'syncing' : ''}`}
+            onClick={triggerSyncNow}
+            disabled={isSyncing}
+            title="Klik untuk menyinkronkan transaksi offline ke cloud sekarang"
+          >
+            <span className="material-symbols-outlined sync-icon">{isSyncing ? 'sync' : 'cloud_upload'}</span>
+            <span>{isSyncing ? 'Menyinkronkan...' : `${pendingSyncCount} Belum Sync`}</span>
+          </button>
+        )}
+
+        {!isOnline ? (
+          <div className="connection-chip offline" title="Aplikasi sedang offline. Transaksi tetap berjalan normal & tersimpan lokal.">
+            <span className="status-dot dot-offline" />
+            <span className="conn-label">Offline</span>
+          </div>
+        ) : pendingSyncCount === 0 ? (
+          <div className="connection-chip online" title="Terhubung ke cloud database">
+            <span className="status-dot dot-online" />
+            <span className="conn-label">Online</span>
+          </div>
+        ) : null}
+
         {installPrompt && (
           <button
             type="button"

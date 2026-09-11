@@ -80,6 +80,8 @@ type CreateOrderRequest struct {
 	TableNo       string           `json:"tableNo,omitempty"`
 	DiscountType  string           `json:"discountType,omitempty"`
 	DiscountValue int              `json:"discountValue,omitempty"`
+	ClientOrderID string           `json:"clientOrderId,omitempty"`
+	CreatedAt     *time.Time       `json:"createdAt,omitempty"`
 }
 
 type TopProduct struct {

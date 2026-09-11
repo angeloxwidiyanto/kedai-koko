@@ -9,7 +9,10 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
     <div className="print-ticket">
       {isReceipt && <img src="/logo.png" alt="Kedai Koko" className="pt-logo-img" />}
       <div className="pt-brand">Kedai Koko</div>
-      <div className="pt-title">{isReceipt ? 'Struk Pembayaran' : 'Tiket Dapur'}</div>
+      <div className="pt-title">
+        {isReceipt ? 'Struk Pembayaran' : 'Tiket Dapur'}
+        {order.isOffline ? ' (OFFLINE)' : ''}
+      </div>
       <div className="pt-rule" />
 
       <div className="pt-row">

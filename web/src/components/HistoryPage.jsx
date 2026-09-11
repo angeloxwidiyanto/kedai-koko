@@ -1,24 +1,48 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getOrders, voidOrder } from '../lib/api'
+import { getPendingOrders } from '../lib/offlineSync'
 import { rupiah, timeID } from '../lib/format'
 import { useShop } from '../shop'
 
 export default function HistoryPage({ onPrint }) {
   const { role } = useShop()
   const [orders, setOrders] = useState(null)
+  const [offlineOrders, setOfflineOrders] = useState([])
   const [error, setError] = useState(null)
   const [voiding, setVoiding] = useState(null)
 
-  function load() {
-    getOrders()
-      .then(setOrders)
-      .catch((e) => setError(e.message))
+  async function load() {
+    let pendingList = []
+    try {
+      const pending = await getPendingOrders()
+      pendingList = (pending || []).map((p) => p.order || p)
+      setOfflineOrders(pendingList)
+    } catch {
+      setOfflineOrders([])
+    }
+
+    try {
+      const sOrders = await getOrders()
+      setOrders(sOrders)
+      setError(null)
+    } catch (e) {
+      if (pendingList.length > 0) {
+        setOrders([])
+        setError(null)
+      } else {
+        setError(e.message)
+      }
+    }
   }
 
   useEffect(() => {
     load()
   }, [])
+
+  const allOrders = useMemo(() => {
+    return [...offlineOrders, ...(orders || [])]
+  }, [offlineOrders, orders])
 
   function summary(order) {
     return order.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
@@ -59,7 +83,7 @@ export default function HistoryPage({ onPrint }) {
             </div>
           ))}
         </div>
-      ) : orders.length === 0 ? (
+      ) : allOrders.length === 0 ? (
         <div className="state-box">
           <span className="material-symbols-outlined">receipt_long</span>
           <h3>Belum ada pesanan</h3>
@@ -67,12 +91,12 @@ export default function HistoryPage({ onPrint }) {
         </div>
       ) : (
         <div className="history-list">
-          {orders.map((o, i) => {
+          {allOrders.map((o, i) => {
             const isVoid = o.status === 'void'
             return (
               <motion.div
                 key={o.id}
-                className={`order-card ${isVoid ? 'voided' : ''}`}
+                className={`order-card ${isVoid ? 'voided' : ''} ${o.isOffline ? 'order-offline' : ''}`}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.05, 0.4) }}
@@ -81,8 +105,8 @@ export default function HistoryPage({ onPrint }) {
                   <span className="order-number">{o.number}</span>
                   <span className="order-type-tag">{o.orderType === 'dine_in' ? '🍽️ Dine In' : '🛍️ Bungkus'}{o.tableNo ? ` · Meja ${o.tableNo}` : ''}</span>
                   <span className="order-type-tag">{o.paymentMethod === 'qris' ? 'QRIS' : 'Tunai'}</span>
-                  <span className={`order-status ${isVoid ? 'status-void' : ''}`}>
-                    {isVoid ? 'Batal' : 'Lunas'}
+                  <span className={`order-status ${isVoid ? 'status-void' : o.isOffline ? 'status-offline' : ''}`}>
+                    {isVoid ? 'Batal' : o.isOffline ? 'Menunggu Sync' : 'Lunas'}
                   </span>
                 </div>
                 <p className="order-summary">{summary(o)}</p>
@@ -102,15 +126,17 @@ export default function HistoryPage({ onPrint }) {
                           <span className="material-symbols-outlined">receipt_long</span>
                           Struk
                         </button>
-                        <button
-                          type="button"
-                          className="reprint-btn void-btn"
-                          onClick={() => doVoid(o)}
-                          disabled={voiding === o.id}
-                        >
-                          <span className="material-symbols-outlined">block</span>
-                          Batalkan
-                        </button>
+                        {!o.isOffline && (
+                          <button
+                            type="button"
+                            className="reprint-btn void-btn"
+                            onClick={() => doVoid(o)}
+                            disabled={voiding === o.id}
+                          >
+                            <span className="material-symbols-outlined">block</span>
+                            Batalkan
+                          </button>
+                        )}
                       </>
                     )}
                     <span className="order-total">{rupiah(o.total)}</span>
