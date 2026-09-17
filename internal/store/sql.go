@@ -846,6 +846,9 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 
 	// stok kemasan untuk take away (legacy setting)
 	if req.OrderType == "take_away" {
+		var pkgCount int
+		_ = tx.QueryRow(ctx, `SELECT count(*) FROM packagings`).Scan(&pkgCount)
+
 		var stock int
 		err := tx.QueryRow(ctx,
 			`SELECT value::int FROM settings WHERE key='packaging_stock' FOR UPDATE`).Scan(&stock)
@@ -854,13 +857,18 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		} else if err != nil {
 			return model.Order{}, err
 		}
-		if totalQty > stock {
+		// Hanya tolak jika belum ada sistem multi-packaging sama sekali
+		if pkgCount == 0 && totalQty > stock {
 			return model.Order{}, ErrOutOfPackaging
+		}
+		newLegacyStock := stock - totalQty
+		if newLegacyStock < 0 {
+			newLegacyStock = 0
 		}
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO settings (key, value) VALUES ('packaging_stock', $1)
 			 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-			fmt.Sprintf("%d", stock-totalQty)); err != nil {
+			fmt.Sprintf("%d", newLegacyStock)); err != nil {
 			return model.Order{}, err
 		}
 	}
@@ -1370,6 +1378,13 @@ func (s *SQLStore) Report(from, to time.Time) (model.Report, error) {
 
 func (s *SQLStore) GetPackagingStock() (int, error) {
 	ctx := context.Background()
+	var pkgCount int
+	_ = s.pool.QueryRow(ctx, `SELECT count(*) FROM packagings`).Scan(&pkgCount)
+	if pkgCount > 0 {
+		var sumStock int
+		err := s.pool.QueryRow(ctx, `SELECT COALESCE(SUM(stock), 0)::int FROM packagings`).Scan(&sumStock)
+		return sumStock, err
+	}
 	var stock int
 	err := s.pool.QueryRow(ctx,
 		`SELECT COALESCE((SELECT value::int FROM settings WHERE key='packaging_stock'), 0)`).Scan(&stock)

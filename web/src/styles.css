@@ -2974,6 +2974,11 @@ button {
 .order-type-summary .material-symbols-outlined {
   font-size: 22px;
 }
+.packaging-note-group {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 2px solid var(--outline-variant);
+}
 .packaging-note {
   display: flex;
   align-items: center;

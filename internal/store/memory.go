@@ -835,6 +835,13 @@ func (s *MemoryStore) Report(from, to time.Time) (model.Report, error) {
 func (s *MemoryStore) GetPackagingStock() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len(s.packagings) > 0 {
+		sum := 0
+		for _, p := range s.packagings {
+			sum += p.Stock
+		}
+		return sum, nil
+	}
 	return s.packaging, nil
 }
 

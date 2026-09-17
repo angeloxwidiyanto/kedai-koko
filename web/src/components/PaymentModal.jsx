@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useShop } from '../shop'
 import { rupiah } from '../lib/format'
 import { calcDiscount } from '../lib/discount'
-import { createOrder, getPackagingStock } from '../lib/api'
+import { createOrder, getPackagingStock, getPackagings } from '../lib/api'
 
 const QUICK = [
   { label: 'Uang Pas', value: null },
@@ -21,15 +21,72 @@ export default function PaymentModal({ onClose, onDone }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   const [packStock, setPackStock] = useState(null)
+  const [packagings, setPackagings] = useState([])
 
   useEffect(() => {
-    if (orderType !== 'take_away') return
-    getPackagingStock()
-      .then((d) => setPackStock(d.stock))
-      .catch(() => setPackStock(null))
+    getPackagings()
+      .then((pkgs) => setPackagings(pkgs || []))
+      .catch(() => setPackagings([]))
+
+    if (orderType === 'take_away') {
+      getPackagingStock()
+        .then((d) => setPackStock(d.stock))
+        .catch(() => setPackStock(null))
+    }
   }, [orderType])
 
   const totalQty = useMemo(() => cartItems.reduce((s, i) => s + i.qty, 0), [cartItems])
+
+  // Hitung kebutuhan multi-kemasan berdasarkan produk di keranjang
+  const packagingStatus = useMemo(() => {
+    if (!packagings || packagings.length === 0) {
+      // Fallback ke legacy check
+      if (orderType !== 'take_away' || packStock === null) {
+        return { ok: true, list: [] }
+      }
+      return {
+        ok: packStock >= totalQty,
+        list: [{
+          id: 'legacy',
+          name: 'Kemasan Bungkus',
+          needed: totalQty,
+          available: packStock,
+          isShort: packStock < totalQty,
+        }],
+      }
+    }
+
+    // Ada multi-kemasan
+    const neededMap = {}
+    cartItems.forEach((item) => {
+      const pkgId = item.packagingId
+      if (!pkgId) return
+      const rule = item.packagingRule || 'take_away_only'
+      const needs = rule === 'always' || (orderType === 'take_away' && rule === 'take_away_only')
+      if (needs) {
+        neededMap[pkgId] = (neededMap[pkgId] || 0) + item.qty
+      }
+    })
+
+    const list = []
+    let allOk = true
+    for (const [pkgId, needed] of Object.entries(neededMap)) {
+      const pkg = packagings.find((p) => p.id === pkgId)
+      const pkgName = pkg ? pkg.name : pkgId
+      const available = pkg ? pkg.stock : 0
+      const isShort = available < needed
+      if (isShort) allOk = false
+      list.push({
+        id: pkgId,
+        name: pkgName,
+        needed,
+        available,
+        isShort,
+      })
+    }
+
+    return { ok: allOk, list }
+  }, [packagings, cartItems, orderType, packStock, totalQty])
 
   const discountAmount = useMemo(
     () => calcDiscount(subtotal, discType, discValue),
@@ -38,7 +95,7 @@ export default function PaymentModal({ onClose, onDone }) {
 
   const total = Math.max(0, subtotal - discountAmount)
   const change = payMethod === 'qris' ? 0 : paid - total
-  const packagingOk = orderType !== 'take_away' || packStock === null || packStock >= totalQty
+  const packagingOk = packagingStatus.ok
   const canPay = total > 0 && (payMethod === 'qris' ? true : change >= 0) && packagingOk && !!orderType && (orderType !== 'dine_in' || !!tableNo.trim())
 
   function pick(value) {
@@ -109,14 +166,18 @@ export default function PaymentModal({ onClose, onDone }) {
           </span>
         </div>
 
-        {orderType === 'take_away' && packStock !== null && (
-          <div className={`packaging-note ${packStock < totalQty ? 'short' : ''}`}>
-            <span className="material-symbols-outlined">inventory_2</span>
-            <span>
-              {packStock < totalQty
-                ? `Stok kemasan kurang (butuh ${totalQty}, sisa ${packStock})`
-                : `Stok kemasan cukup (${packStock} tersisa)`}
-            </span>
+        {packagingStatus.list.length > 0 && (
+          <div className={`packaging-note-group ${!packagingStatus.ok ? 'short' : ''}`}>
+            {packagingStatus.list.map((item) => (
+              <div key={item.id} className={`packaging-note ${item.isShort ? 'short' : ''}`}>
+                <span className="material-symbols-outlined">inventory_2</span>
+                <span>
+                  {item.name}: {item.isShort
+                    ? `Stok kurang (butuh ${item.needed}, sisa ${item.available})`
+                    : `Cukup (butuh ${item.needed}, sisa ${item.available})`}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
