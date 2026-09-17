@@ -65,26 +65,27 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID             string      `json:"id"`
-	Number         string      `json:"number"`
-	OrderType      string      `json:"orderType"`
-	TableNo        string      `json:"tableNo,omitempty"`
-	Items          []OrderItem `json:"items"`
-	Subtotal       int         `json:"subtotal"`
-	DiscountType   string      `json:"discountType,omitempty"`
-	DiscountValue  int         `json:"discountValue,omitempty"`
-	DiscountAmount int         `json:"discountAmount"`
-	Total          int         `json:"total"`
-	Paid           int         `json:"paid"`
-	Change         int         `json:"change"`
-	PaymentMethod  string      `json:"paymentMethod"`
-	Status         string      `json:"status"`
-	CashierID      string      `json:"cashierId"`
-	CashierName    string      `json:"cashierName"`
-	VoidedAt       *time.Time  `json:"voidedAt,omitempty"`
-	VoidReason     string      `json:"voidReason,omitempty"`
-	VoidedBy       string      `json:"voidedBy,omitempty"`
-	CreatedAt      time.Time   `json:"createdAt"`
+	ID                string      `json:"id"`
+	Number            string      `json:"number"`
+	OrderType         string      `json:"orderType"`
+	TableNo           string      `json:"tableNo,omitempty"`
+	Items             []OrderItem `json:"items"`
+	Subtotal          int         `json:"subtotal"`
+	PackagingFeeTotal int         `json:"packagingFeeTotal,omitempty"`
+	DiscountType      string      `json:"discountType,omitempty"`
+	DiscountValue     int         `json:"discountValue,omitempty"`
+	DiscountAmount    int         `json:"discountAmount"`
+	Total             int         `json:"total"`
+	Paid              int         `json:"paid"`
+	Change            int         `json:"change"`
+	PaymentMethod     string      `json:"paymentMethod"`
+	Status            string      `json:"status"`
+	CashierID         string      `json:"cashierId"`
+	CashierName       string      `json:"cashierName"`
+	VoidedAt          *time.Time  `json:"voidedAt,omitempty"`
+	VoidReason        string      `json:"voidReason,omitempty"`
+	VoidedBy          string      `json:"voidedBy,omitempty"`
+	CreatedAt         time.Time   `json:"createdAt"`
 }
 
 type OrderItemInput struct {
@@ -94,15 +95,16 @@ type OrderItemInput struct {
 }
 
 type CreateOrderRequest struct {
-	Items         []OrderItemInput `json:"items"`
-	Paid          int              `json:"paid"`
-	PaymentMethod string           `json:"paymentMethod"`
-	OrderType     string           `json:"orderType"`
-	TableNo       string           `json:"tableNo,omitempty"`
-	DiscountType  string           `json:"discountType,omitempty"`
-	DiscountValue int              `json:"discountValue,omitempty"`
-	ClientOrderID string           `json:"clientOrderId,omitempty"`
-	CreatedAt     *time.Time       `json:"createdAt,omitempty"`
+	Items             []OrderItemInput `json:"items"`
+	Paid              int              `json:"paid"`
+	PaymentMethod     string           `json:"paymentMethod"`
+	OrderType         string           `json:"orderType"`
+	TableNo           string           `json:"tableNo,omitempty"`
+	DiscountType      string           `json:"discountType,omitempty"`
+	DiscountValue     int              `json:"discountValue,omitempty"`
+	PackagingFeeTotal int              `json:"packagingFeeTotal,omitempty"`
+	ClientOrderID     string           `json:"clientOrderId,omitempty"`
+	CreatedAt         *time.Time       `json:"createdAt,omitempty"`
 }
 
 type TopProduct struct {

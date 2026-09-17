@@ -19,6 +19,7 @@ type MemoryStore struct {
 	users         []model.User
 	counter       int
 	packaging     int
+	packagingFee  int
 }
 
 func NewMemory() *MemoryStore {
@@ -28,6 +29,7 @@ func NewMemory() *MemoryStore {
 		packagings:    append([]model.Packaging(nil), defaultPackagings...),
 		orders:        sampleOrders(time.Now()),
 		packaging:     100,
+		packagingFee:  2000,
 	}
 	s.counter = len(s.orders)
 	s.seedAdmin()
@@ -467,6 +469,12 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		return model.Order{}, ErrOutOfPackaging
 	}
 
+	packagingFeeTotal := req.PackagingFeeTotal
+	if packagingFeeTotal < 0 {
+		packagingFeeTotal = 0
+	}
+	subtotal += packagingFeeTotal
+
 	discount := calcDiscount(subtotal, req.DiscountType, req.DiscountValue)
 	total := subtotal - discount
 	if total < 0 {
@@ -545,23 +553,24 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	}
 
 	order := model.Order{
-		ID:             id,
-		Number:         orderNumber,
-		OrderType:      req.OrderType,
-		TableNo:        req.TableNo,
-		Items:          items,
-		Subtotal:       subtotal,
-		DiscountType:   req.DiscountType,
-		DiscountValue:  req.DiscountValue,
-		DiscountAmount: discount,
-		Total:          total,
-		Paid:           paid,
-		Change:         change,
-		PaymentMethod:  req.PaymentMethod,
-		Status:         "paid",
-		CashierID:      cashier.ID,
-		CashierName:    cashier.Name,
-		CreatedAt:      now,
+		ID:                id,
+		Number:            orderNumber,
+		OrderType:         req.OrderType,
+		TableNo:           req.TableNo,
+		Items:             items,
+		Subtotal:          subtotal,
+		PackagingFeeTotal: packagingFeeTotal,
+		DiscountType:      req.DiscountType,
+		DiscountValue:     req.DiscountValue,
+		DiscountAmount:    discount,
+		Total:             total,
+		Paid:              paid,
+		Change:            change,
+		PaymentMethod:     req.PaymentMethod,
+		Status:            "paid",
+		CashierID:         cashier.ID,
+		CashierName:       cashier.Name,
+		CreatedAt:         now,
 	}
 	s.orders = append(s.orders, order)
 	return order, nil
@@ -852,6 +861,25 @@ func (s *MemoryStore) SetPackagingStock(n int) error {
 		return ErrInvalidPackaging
 	}
 	s.packaging = n
+	return nil
+}
+
+func (s *MemoryStore) GetPackagingFee() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.packagingFee <= 0 {
+		return 2000, nil
+	}
+	return s.packagingFee, nil
+}
+
+func (s *MemoryStore) SetPackagingFee(fee int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if fee < 0 {
+		fee = 0
+	}
+	s.packagingFee = fee
 	return nil
 }
 

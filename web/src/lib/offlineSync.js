@@ -99,6 +99,9 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
     }
   })
 
+  const packagingFeeTotal = payload.packagingFeeTotal || 0
+  subtotal += packagingFeeTotal
+
   const discount = calcDiscount(subtotal, payload.discountType, payload.discountValue)
   const total = Math.max(0, subtotal - discount)
   const paid = payload.paymentMethod === 'qris' ? total : (payload.paid || total)
@@ -116,6 +119,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
     tableNo: payload.tableNo || '',
     items: enrichedItems,
     subtotal,
+    packagingFeeTotal,
     discountType: payload.discountType || '',
     discountValue: payload.discountValue || 0,
     discountAmount: discount,
@@ -140,6 +144,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
       tableNo: payload.tableNo,
       discountType: payload.discountType,
       discountValue: payload.discountValue,
+      packagingFeeTotal,
       clientOrderId: id,
       createdAt: nowISO,
     },

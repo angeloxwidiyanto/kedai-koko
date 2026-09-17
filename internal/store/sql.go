@@ -151,6 +151,7 @@ func (s *SQLStore) migrate(ctx context.Context) error {
 		)`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_id text NOT NULL DEFAULT ''`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_rule text NOT NULL DEFAULT 'take_away_only'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS packaging_fee_total int NOT NULL DEFAULT 0`,
 	}
 
 	for _, st := range stmts {
@@ -228,6 +229,18 @@ func (s *SQLStore) seed(ctx context.Context) error {
 	}
 	if packCount == 0 {
 		_, err := s.pool.Exec(ctx, `INSERT INTO settings (key, value) VALUES ('packaging_stock', '100')`)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Seed biaya kemasan per item (default Rp2.000) jika belum ada
+	var feeCount int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM settings WHERE key='packaging_fee'`).Scan(&feeCount); err != nil {
+		return err
+	}
+	if feeCount == 0 {
+		_, err := s.pool.Exec(ctx, `INSERT INTO settings (key, value) VALUES ('packaging_fee', '2000')`)
 		if err != nil {
 			return err
 		}
@@ -720,11 +733,11 @@ func (s *SQLStore) Authenticate(id, pin string) (model.User, error) {
 
 // --- Pesanan ---
 
-const orderCols = `id, number, order_type, table_no, subtotal, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
+const orderCols = `id, number, order_type, table_no, subtotal, packaging_fee_total, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
 
 func scanOrder(row pgx.Row) (model.Order, error) {
 	var o model.Order
-	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
+	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.PackagingFeeTotal, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
 		&o.Total, &o.Paid, &o.Change, &o.PaymentMethod, &o.Status, &o.CashierID, &o.CashierName,
 		&o.VoidedAt, &o.VoidReason, &o.VoidedBy, &o.CreatedAt)
 	return o, err
@@ -828,6 +841,12 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		subtotal += pr.price * it.Qty
 		totalQty += it.Qty
 	}
+
+	packagingFeeTotal := req.PackagingFeeTotal
+	if packagingFeeTotal < 0 {
+		packagingFeeTotal = 0
+	}
+	subtotal += packagingFeeTotal
 
 	discount := calcDiscount(subtotal, req.DiscountType, req.DiscountValue)
 	total := subtotal - discount
@@ -942,9 +961,9 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO orders (id, number, order_type, table_no, subtotal, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'paid', $13, $14, $15)`,
-		id, number, req.OrderType, req.TableNo, subtotal, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
+		`INSERT INTO orders (id, number, order_type, table_no, subtotal, packaging_fee_total, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'paid', $14, $15, $16)`,
+		id, number, req.OrderType, req.TableNo, subtotal, packagingFeeTotal, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
 		return model.Order{}, err
 	}
 
@@ -971,23 +990,24 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	}
 
 	return model.Order{
-		ID:             id,
-		Number:         number,
-		OrderType:      req.OrderType,
-		TableNo:        req.TableNo,
-		Items:          items,
-		Subtotal:       subtotal,
-		DiscountType:   req.DiscountType,
-		DiscountValue:  req.DiscountValue,
-		DiscountAmount: discount,
-		Total:          total,
-		Paid:           paid,
-		Change:         change,
-		PaymentMethod:  req.PaymentMethod,
-		Status:         "paid",
-		CashierID:      cashier.ID,
-		CashierName:    cashier.Name,
-		CreatedAt:      now,
+		ID:                id,
+		Number:            number,
+		OrderType:         req.OrderType,
+		TableNo:           req.TableNo,
+		Items:             items,
+		Subtotal:          subtotal,
+		PackagingFeeTotal: packagingFeeTotal,
+		DiscountType:      req.DiscountType,
+		DiscountValue:     req.DiscountValue,
+		DiscountAmount:    discount,
+		Total:             total,
+		Paid:              paid,
+		Change:            change,
+		PaymentMethod:     req.PaymentMethod,
+		Status:            "paid",
+		CashierID:         cashier.ID,
+		CashierName:       cashier.Name,
+		CreatedAt:         now,
 	}, nil
 }
 
@@ -1400,6 +1420,29 @@ func (s *SQLStore) SetPackagingStock(n int) error {
 		`INSERT INTO settings (key, value) VALUES ('packaging_stock', $1)
 		 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
 		fmt.Sprintf("%d", n))
+	return err
+}
+
+func (s *SQLStore) GetPackagingFee() (int, error) {
+	ctx := context.Background()
+	var fee int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COALESCE((SELECT value::int FROM settings WHERE key='packaging_fee'), 2000)`).Scan(&fee)
+	if err != nil {
+		return 2000, nil
+	}
+	return fee, nil
+}
+
+func (s *SQLStore) SetPackagingFee(fee int) error {
+	ctx := context.Background()
+	if fee < 0 {
+		fee = 0
+	}
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO settings (key, value) VALUES ('packaging_fee', $1)
+		 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+		fmt.Sprintf("%d", fee))
 	return err
 }
 

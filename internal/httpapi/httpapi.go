@@ -72,6 +72,8 @@ func Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/reports/orders.csv", HandleReportCSV)
 	mux.HandleFunc("GET /api/settings/packaging", HandleGetPackaging)
 	mux.HandleFunc("PATCH /api/settings/packaging", HandleSetPackaging)
+	mux.HandleFunc("GET /api/settings/packaging-fee", HandleGetPackagingFee)
+	mux.HandleFunc("PATCH /api/settings/packaging-fee", HandleSetPackagingFee)
 
 	// Multi Kemasan
 	mux.HandleFunc("GET /api/packagings", HandleGetPackagings)

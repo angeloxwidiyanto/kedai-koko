@@ -69,9 +69,11 @@ type Store interface {
 	OrdersRange(from, to time.Time) ([]model.Order, error)
 	Report(from, to time.Time) (model.Report, error)
 
-	// Stok kemasan
+	// Stok kemasan & Biaya Kemasan
 	GetPackagingStock() (int, error)
 	SetPackagingStock(n int) error
+	GetPackagingFee() (int, error)
+	SetPackagingFee(fee int) error
 	Packagings() ([]model.Packaging, error)
 	CreatePackaging(p model.Packaging) (model.Packaging, error)
 	UpdatePackaging(p model.Packaging) (model.Packaging, error)

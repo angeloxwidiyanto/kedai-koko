@@ -200,6 +200,9 @@ export function receipt(order) {
   divider()
 
   line(twoCol('Subtotal', rupiah(order.subtotal || order.total)))
+  if (order.packagingFeeTotal > 0) {
+    line(twoCol('Biaya Kemasan', rupiah(order.packagingFeeTotal)))
+  }
   if (order.discountAmount > 0) {
     line(twoCol('Diskon', '-' + rupiah(order.discountAmount)))
   }

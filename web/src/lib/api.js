@@ -255,6 +255,16 @@ export function getPackagingLogs(limit = 100) {
   return fetch(`/api/admin/packagings/logs?limit=${limit}`, { headers: headers() }).then(json)
 }
 
+export function getPackagingFee() {
+  return fetch('/api/settings/packaging-fee', { headers: headers() }).then(json)
+}
+
+export function setPackagingFee(fee) {
+  return fetch('/api/settings/packaging-fee', {
+    method: 'PATCH', headers: headers(), body: JSON.stringify({ fee }),
+  }).then(json)
+}
+
 // --- Upload gambar (admin) ---
 export function uploadImage(file) {
   const form = new FormData()

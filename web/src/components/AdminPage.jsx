@@ -16,12 +16,14 @@ import {
   getAdminProducts,
   getAdminUsers,
   getCategories,
+  getPackagingFee,
   getPackagingLogs,
   getPackagings,
   getPackagingStock,
   getReportSummary,
   restoreProduct,
   setAvailability,
+  setPackagingFee as setPackagingFeeApi,
   setPackagingStock,
   setStock,
   updateCategory,
@@ -904,6 +906,27 @@ function PackagingPanel({ packagings = [], onRefresh, onToast }) {
   const [newStock, setNewStock] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const [feeInput, setFeeInput] = useState(2000)
+  const [savingFee, setSavingFee] = useState(false)
+
+  useEffect(() => {
+    getPackagingFee().then((d) => { if (d?.fee != null) setFeeInput(d.fee) }).catch(() => {})
+  }, [])
+
+  async function handleSaveFee(e) {
+    e.preventDefault()
+    const fee = Math.max(0, parseInt(feeInput, 10) || 0)
+    setSavingFee(true)
+    try {
+      await setPackagingFeeApi(fee)
+      onToast(`Biaya kemasan diperbarui: Rp${fee.toLocaleString('id-ID')}`)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSavingFee(false)
+    }
+  }
+
   async function handleAdjust(e) {
     e.preventDefault()
     const chg = parseInt(adjustChange, 10)
@@ -961,6 +984,28 @@ function PackagingPanel({ packagings = [], onRefresh, onToast }) {
           Wadah Baru
         </button>
       </div>
+
+      {/* Setting biaya kemasan per item */}
+      <form className="packaging-fee-card" onSubmit={handleSaveFee}>
+        <label className="setting-label">
+          <span className="material-symbols-outlined">price_change</span>
+          Biaya Kemasan per Item (Rp)
+        </label>
+        <div className="setting-row">
+          <input
+            type="number"
+            className="setting-input"
+            min="0"
+            step="500"
+            value={feeInput}
+            onChange={(e) => setFeeInput(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary btn-sm" disabled={savingFee}>
+            {savingFee ? 'Menyimpan...' : 'Simpan'}
+          </button>
+        </div>
+        <p className="setting-hint">Dikenakan otomatis untuk pesanan Bungkus (per item), atau saat kasir menekan &ldquo;Kemasan Tambahan&rdquo; di mode Makan di Tempat.</p>
+      </form>
 
       <div className="packaging-cards-grid">
         {packagings.map((pkg) => (

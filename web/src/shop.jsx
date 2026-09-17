@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin, syncOrderToServer } from './lib/api'
+import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin, syncOrderToServer, getPackagingFee } from './lib/api'
 import {
   cacheCatalog,
   getCachedCatalog,
@@ -52,6 +52,7 @@ export function ShopProvider({ children }) {
   )
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [packagingFee, setPackagingFee] = useState(2000)
 
   const idleTimer = useRef(null)
 
@@ -124,13 +125,14 @@ export function ShopProvider({ children }) {
     let active = true
     setLoading(true)
     setError(null)
-    Promise.all([getProducts(), getCategories(), getMe()])
-      .then(([p, c, me]) => {
+    Promise.all([getProducts(), getCategories(), getMe(), getPackagingFee().catch(() => ({ fee: 2000 }))])
+      .then(([p, c, me, feeResp]) => {
         if (!active) return
         setProducts(p)
         setCategories(c)
         setUser(me)
         setAuthRequired(false)
+        if (feeResp?.fee != null) setPackagingFee(feeResp.fee)
         cacheCatalog(p, c, me)
       })
       .catch(async (e) => {
@@ -219,6 +221,34 @@ export function ShopProvider({ children }) {
           productId,
           qty: 1,
           note: '',
+        },
+      }
+    })
+  }, [])
+
+  // Tambah kemasan cepat (quick packaging) untuk dine-in yang minta bungkus
+  const addQuickPackaging = useCallback((qty = 1) => {
+    const productId = '__quick_packaging__'
+    setCart((prev) => {
+      const existing = Object.values(prev).find((it) => it.productId === productId)
+      if (existing) {
+        return {
+          ...prev,
+          [existing.cartItemId]: {
+            ...existing,
+            qty: existing.qty + qty,
+          },
+        }
+      }
+      const cartItemId = `${productId}_${Date.now()}`
+      return {
+        ...prev,
+        [cartItemId]: {
+          cartItemId,
+          productId,
+          qty,
+          note: '',
+          isQuickPackaging: true,
         },
       }
     })
@@ -318,7 +348,7 @@ export function ShopProvider({ children }) {
 
   const cartItems = useMemo(() => {
     const pMap = new Map(products.map((p) => [p.id, p]))
-    return Object.values(cart)
+    const regularItems = Object.values(cart)
       .filter((it) => it.qty > 0 && pMap.has(it.productId))
       .map((it) => {
         const p = pMap.get(it.productId)
@@ -329,7 +359,21 @@ export function ShopProvider({ children }) {
           note: it.note || '',
         }
       })
-  }, [products, cart])
+    // Synthetic quick packaging items (tidak ada di catalog products)
+    const quickItems = Object.values(cart)
+      .filter((it) => it.qty > 0 && it.isQuickPackaging)
+      .map((it) => ({
+        id: it.productId,
+        cartItemId: it.cartItemId,
+        name: 'Kemasan Tambahan',
+        price: packagingFee,
+        qty: it.qty,
+        note: it.note || '',
+        isQuickPackaging: true,
+        emoji: '📦',
+      }))
+    return [...regularItems, ...quickItems]
+  }, [products, cart, packagingFee])
 
   const count = useMemo(() => cartItems.reduce((s, i) => s + i.qty, 0), [cartItems])
   const subtotal = useMemo(() => cartItems.reduce((s, i) => s + i.qty * i.price, 0), [cartItems])
@@ -347,6 +391,7 @@ export function ShopProvider({ children }) {
     logout,
     cart,
     add,
+    addQuickPackaging,
     remove,
     updateQty,
     splitItem,
@@ -361,6 +406,7 @@ export function ShopProvider({ children }) {
     cartItems,
     count,
     subtotal,
+    packagingFee,
     isOnline,
     pendingSyncCount,
     isSyncing,

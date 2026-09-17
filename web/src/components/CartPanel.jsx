@@ -56,7 +56,7 @@ function NoteEditor({ item }) {
 }
 
 export default function CartPanel({ onCheckout }) {
-  const { cartItems, count, subtotal, updateQty, splitItem } = useShop()
+  const { cartItems, count, subtotal, updateQty, splitItem, addQuickPackaging, packagingFee, orderType } = useShop()
 
   return (
     <aside className="cart-panel">
@@ -107,7 +107,7 @@ export default function CartPanel({ onCheckout }) {
                       </button>
                     </div>
 
-                    {item.qty > 1 && (
+                    {item.qty > 1 && !item.isQuickPackaging && (
                       <button
                         type="button"
                         className="split-btn"
@@ -119,7 +119,7 @@ export default function CartPanel({ onCheckout }) {
                       </button>
                     )}
                   </div>
-                  <NoteEditor item={item} />
+                  {!item.isQuickPackaging && <NoteEditor item={item} />}
                 </div>
                 <span className="cart-line-total">{rupiah(item.price * item.qty)}</span>
               </motion.div>
@@ -127,6 +127,20 @@ export default function CartPanel({ onCheckout }) {
           </AnimatePresence>
         )}
       </div>
+
+      {/* Tombol kemasan cepat — muncul jika dine-in atau sudah ada item di keranjang */}
+      {cartItems.length > 0 && orderType === 'dine_in' && (
+        <div className="quick-packaging-bar">
+          <button
+            type="button"
+            className="btn quick-packaging-btn"
+            onClick={() => addQuickPackaging(1)}
+          >
+            <span className="material-symbols-outlined">add</span>
+            Kemasan Tambahan (+{rupiah(packagingFee)})
+          </button>
+        </div>
+      )}
 
       <div className="cart-totals">
         <div className="row">

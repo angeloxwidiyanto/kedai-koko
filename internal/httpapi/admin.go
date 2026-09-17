@@ -429,3 +429,35 @@ func HandlePackagingLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, logs)
 }
+
+func HandleGetPackagingFee(w http.ResponseWriter, r *http.Request) {
+	if !authorized(r) {
+		writeError(w, http.StatusUnauthorized, "tidak diizinkan")
+		return
+	}
+	fee, err := store.Default.GetPackagingFee()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "gagal mengambil biaya kemasan")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"fee": fee})
+}
+
+func HandleSetPackagingFee(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	var body struct {
+		Fee int `json:"fee"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	if err := store.Default.SetPackagingFee(body.Fee); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	fee, _ := store.Default.GetPackagingFee()
+	writeJSON(w, http.StatusOK, map[string]int{"fee": fee})
+}
