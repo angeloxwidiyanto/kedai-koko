@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { getOrders, voidOrder } from '../lib/api'
-import { getPendingOrders } from '../lib/offlineSync'
+import { getOrders, voidOrder, syncOrderToServer } from '../lib/api'
+import { getPendingOrders, discardPendingOrder, syncSingleOrder, subscribeSync } from '../lib/offlineSync'
 import { rupiah, timeID } from '../lib/format'
 import { useShop } from '../shop'
 
@@ -11,12 +11,19 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
   const [offlineOrders, setOfflineOrders] = useState([])
   const [error, setError] = useState(null)
   const [voiding, setVoiding] = useState(null)
+  const [syncingId, setSyncingId] = useState(null)
 
   async function load() {
     let pendingList = []
     try {
       const pending = await getPendingOrders()
-      pendingList = (pending || []).map((p) => p.order || p)
+      pendingList = (pending || []).map((p) => {
+        const ord = p.order || p
+        return {
+          ...ord,
+          lastError: p.lastError || ord.lastError || null,
+        }
+      })
       setOfflineOrders(pendingList)
     } catch {
       setOfflineOrders([])
@@ -38,6 +45,10 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
 
   useEffect(() => {
     load()
+    const unsub = subscribeSync(() => {
+      load()
+    })
+    return unsub
   }, [])
 
   const allOrders = useMemo(() => {
@@ -99,6 +110,34 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
     if (onNav) onNav('menu')
   }
 
+  async function handleSyncSingle(order) {
+    setSyncingId(order.id)
+    try {
+      await syncSingleOrder(order.id, syncOrderToServer)
+      if (onToast) onToast(`Pesanan ${order.number} berhasil disinkronkan ke cloud!`)
+      load()
+    } catch (err) {
+      if (onToast) onToast(`Gagal sinkron pesanan ${order.number}: ${err.message}`)
+      load()
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  async function handleDiscardOffline(order) {
+    const ok = window.confirm(
+      `Hapus pesanan offline ${order.number} dari antrean tablet ini? Tindakan ini tidak dapat dibatalkan.`
+    )
+    if (!ok) return
+    try {
+      await discardPendingOrder(order.id)
+      if (onToast) onToast(`Pesanan offline ${order.number} dihapus dari tablet`)
+      load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   return (
     <div className="page-inner">
       <div className="page-heading">
@@ -147,6 +186,12 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
                     {isVoid ? 'Batal' : o.isOffline ? 'Menunggu Sync' : 'Lunas'}
                   </span>
                 </div>
+                {o.isOffline && o.lastError && (
+                  <div className="order-offline-error">
+                    <span className="material-symbols-outlined">warning</span>
+                    <span>Kendala sinkronisasi: {o.lastError}</span>
+                  </div>
+                )}
                 <p className="order-summary">{summary(o)}</p>
                 <div className="order-card-bottom">
                   <span className="order-time">
@@ -164,7 +209,31 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
                           <span className="material-symbols-outlined">receipt_long</span>
                           Struk
                         </button>
-                        {!o.isOffline && (
+                        {o.isOffline ? (
+                          <>
+                            <button
+                              type="button"
+                              className="reprint-btn sync-single-btn"
+                              title="Coba sinkronkan pesanan offline ini ke cloud sekarang"
+                              onClick={() => handleSyncSingle(o)}
+                              disabled={syncingId === o.id}
+                            >
+                              <span className={`material-symbols-outlined ${syncingId === o.id ? 'spin' : ''}`}>
+                                {syncingId === o.id ? 'sync' : 'cloud_upload'}
+                              </span>
+                              {syncingId === o.id ? 'Sync...' : 'Sync Ulang'}
+                            </button>
+                            <button
+                              type="button"
+                              className="reprint-btn discard-offline-btn"
+                              title="Hapus pesanan ini dari antrean offline tablet"
+                              onClick={() => handleDiscardOffline(o)}
+                            >
+                              <span className="material-symbols-outlined">delete_outline</span>
+                              Hapus
+                            </button>
+                          </>
+                        ) : (
                           <>
                             <button
                               type="button"

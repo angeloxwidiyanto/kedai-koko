@@ -261,6 +261,74 @@ export async function getCachedCatalog() {
 }
 
 /**
+ * Update status error pada record pending order di IndexedDB.
+ */
+export async function updatePendingOrderError(id, errorMsg) {
+  try {
+    const db = await openDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PENDING, 'readwrite')
+      const store = tx.objectStore(STORE_PENDING)
+      const req = store.get(id)
+      req.onsuccess = () => {
+        const data = req.result
+        if (data) {
+          data.status = 'failed'
+          data.lastError = errorMsg
+          data.retryCount = (data.retryCount || 0) + 1
+          if (data.order) {
+            data.order.lastError = errorMsg
+          }
+          store.put(data)
+        }
+        resolve()
+      }
+      req.onerror = () => reject(req.error)
+    })
+    notifySync({ type: 'order_updated', id, error: errorMsg })
+  } catch (e) {
+    console.warn('[offlineSync] gagal update error order:', id, e)
+  }
+}
+
+/**
+ * Hapus pesanan dari antrean IndexedDB secara manual (discard / buang).
+ */
+export async function discardPendingOrder(id) {
+  return removePendingOrder(id)
+}
+
+/**
+ * Sinkronisasi satu pesanan offline tertentu ke backend.
+ */
+export async function syncSingleOrder(id, syncHandler) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Perangkat sedang offline. Sambungkan ke internet terlebih dahulu.')
+  }
+  const db = await openDB()
+  const record = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_PENDING, 'readonly')
+    const req = tx.objectStore(STORE_PENDING).get(id)
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+
+  if (!record) {
+    throw new Error('Pesanan offline tidak ditemukan di antrean.')
+  }
+
+  try {
+    const res = await syncHandler(record.payload)
+    await removePendingOrder(id)
+    return res
+  } catch (err) {
+    const msg = err.message || 'Gagal sinkronisasi ke server'
+    await updatePendingOrderError(id, msg)
+    throw err
+  }
+}
+
+/**
  * Sinkronisasi seluruh antrean pesanan offline ke backend.
  * @param {Function} syncHandler fungsi pengirim API, default panggil /api/orders
  */
@@ -287,7 +355,10 @@ export async function syncPendingOrders(syncHandler) {
       } catch (err) {
         console.warn(`[offlineSync] gagal sinkron order ${item.id}:`, err)
         failedCount++
-        // Jika network error (koneksi terputus saat sync), hentikan iterasi
+        const errMsg = err.message || 'Gagal tersambung ke server'
+        await updatePendingOrderError(item.id, errMsg)
+
+        // Jika koneksi internet benar-benar terputus di tengah jalan, hentikan batch loop
         if (!navigator.onLine || err.message?.includes('fetch') || err.status === 0) {
           break
         }

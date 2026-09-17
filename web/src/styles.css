@@ -1869,6 +1869,46 @@ button {
   color: #b45309;
   border: 1px solid #f59e0b;
 }
+.order-offline-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px 0;
+  padding: 8px 12px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--r-sm);
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+}
+.order-offline-error .material-symbols-outlined {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.reprint-btn.sync-single-btn {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #f59e0b;
+}
+.reprint-btn.sync-single-btn:hover {
+  background: #fde68a;
+}
+.reprint-btn.discard-offline-btn {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.reprint-btn.discard-offline-btn:hover {
+  background: #fecaca;
+}
+@keyframes spinIcon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.material-symbols-outlined.spin {
+  animation: spinIcon 1s linear infinite;
+}
 
 /* ===== Product card image & sold out ===== */
 .card-img {
