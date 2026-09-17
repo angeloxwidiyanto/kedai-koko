@@ -155,6 +155,9 @@ export function kitchenTicket(order) {
       }
     }
   }
+  if (order.packagingQty > 0) {
+    line(`* Kemasan: ${order.packagingQty} pcs`)
+  }
   divider()
 
   align(1)
@@ -201,7 +204,9 @@ export function receipt(order) {
 
   line(twoCol('Subtotal', rupiah(order.subtotal || order.total)))
   if (order.packagingFeeTotal > 0) {
-    line(twoCol('Biaya Kemasan', rupiah(order.packagingFeeTotal)))
+    line(twoCol(`Biaya Kemasan${order.packagingQty ? ' (' + order.packagingQty + 'x)' : ''}`, rupiah(order.packagingFeeTotal)))
+  } else if (order.packagingQty > 0) {
+    line(twoCol(`Kemasan (${order.packagingQty}x)`, 'GRATIS'))
   }
   if (order.discountAmount > 0) {
     line(twoCol('Diskon', '-' + rupiah(order.discountAmount)))

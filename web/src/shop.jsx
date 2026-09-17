@@ -226,8 +226,10 @@ export function ShopProvider({ children }) {
     })
   }, [])
 
-  // Tambah kemasan cepat (quick packaging) untuk dine-in yang minta bungkus
-  const addQuickPackaging = useCallback((qty = 1) => {
+  // Tambah kemasan cepat (quick packaging)
+  // dine-in → gratis (Rp0, tracking only)
+  // take-away → kena packagingFee
+  const addQuickPackaging = useCallback((qty = 1, overridePrice = null) => {
     const productId = '__quick_packaging__'
     setCart((prev) => {
       const existing = Object.values(prev).find((it) => it.productId === productId)
@@ -249,6 +251,7 @@ export function ShopProvider({ children }) {
           qty,
           note: '',
           isQuickPackaging: true,
+          overridePrice,  // null = gunakan packagingFee, 0 = gratis
         },
       }
     })
@@ -362,16 +365,20 @@ export function ShopProvider({ children }) {
     // Synthetic quick packaging items (tidak ada di catalog products)
     const quickItems = Object.values(cart)
       .filter((it) => it.qty > 0 && it.isQuickPackaging)
-      .map((it) => ({
-        id: it.productId,
-        cartItemId: it.cartItemId,
-        name: 'Kemasan Tambahan',
-        price: packagingFee,
-        qty: it.qty,
-        note: it.note || '',
-        isQuickPackaging: true,
-        emoji: '📦',
-      }))
+      .map((it) => {
+        const effectivePrice = it.overridePrice !== null && it.overridePrice !== undefined ? it.overridePrice : packagingFee
+        return {
+          id: it.productId,
+          cartItemId: it.cartItemId,
+          name: effectivePrice === 0 ? 'Kemasan Tambahan (Gratis)' : 'Kemasan Tambahan',
+          price: effectivePrice,
+          qty: it.qty,
+          note: it.note || '',
+          isQuickPackaging: true,
+          isFreePackaging: effectivePrice === 0,
+          emoji: '📦',
+        }
+      })
     return [...regularItems, ...quickItems]
   }, [products, cart, packagingFee])
 

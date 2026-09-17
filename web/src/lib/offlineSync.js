@@ -100,6 +100,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
   })
 
   const packagingFeeTotal = payload.packagingFeeTotal || 0
+  const packagingQty = payload.packagingQty || 0
   subtotal += packagingFeeTotal
 
   const discount = calcDiscount(subtotal, payload.discountType, payload.discountValue)
@@ -120,6 +121,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
     items: enrichedItems,
     subtotal,
     packagingFeeTotal,
+    packagingQty,
     discountType: payload.discountType || '',
     discountValue: payload.discountValue || 0,
     discountAmount: discount,
@@ -145,6 +147,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
       discountType: payload.discountType,
       discountValue: payload.discountValue,
       packagingFeeTotal,
+      packagingQty,
       clientOrderId: id,
       createdAt: nowISO,
     },

@@ -511,9 +511,12 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		now = *req.CreatedAt
 	}
 
-	// kurangi stok kemasan untuk take away (legacy)
+	// kurangi stok kemasan untuk take away atau tambahan kemasan (legacy)
 	if req.OrderType == "take_away" {
 		s.packaging -= totalQty
+	}
+	if req.PackagingQty > 0 {
+		s.packaging -= req.PackagingQty
 	}
 
 	// Catat pemakaian multi-kemasan
@@ -560,6 +563,7 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		Items:             items,
 		Subtotal:          subtotal,
 		PackagingFeeTotal: packagingFeeTotal,
+		PackagingQty:      req.PackagingQty,
 		DiscountType:      req.DiscountType,
 		DiscountValue:     req.DiscountValue,
 		DiscountAmount:    discount,

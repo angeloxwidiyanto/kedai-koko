@@ -152,6 +152,7 @@ func (s *SQLStore) migrate(ctx context.Context) error {
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_id text NOT NULL DEFAULT ''`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_rule text NOT NULL DEFAULT 'take_away_only'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS packaging_fee_total int NOT NULL DEFAULT 0`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS packaging_qty int NOT NULL DEFAULT 0`,
 	}
 
 	for _, st := range stmts {
@@ -733,11 +734,11 @@ func (s *SQLStore) Authenticate(id, pin string) (model.User, error) {
 
 // --- Pesanan ---
 
-const orderCols = `id, number, order_type, table_no, subtotal, packaging_fee_total, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
+const orderCols = `id, number, order_type, table_no, subtotal, packaging_fee_total, packaging_qty, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
 
 func scanOrder(row pgx.Row) (model.Order, error) {
 	var o model.Order
-	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.PackagingFeeTotal, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
+	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.PackagingFeeTotal, &o.PackagingQty, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
 		&o.Total, &o.Paid, &o.Change, &o.PaymentMethod, &o.Status, &o.CashierID, &o.CashierName,
 		&o.VoidedAt, &o.VoidReason, &o.VoidedBy, &o.CreatedAt)
 	return o, err
@@ -863,8 +864,15 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		return model.Order{}, ErrPaymentShort
 	}
 
-	// stok kemasan untuk take away (legacy setting)
+	// stok kemasan untuk take away atau tambahan kemasan
+	neededPackaging := 0
 	if req.OrderType == "take_away" {
+		neededPackaging += totalQty
+	}
+	if req.PackagingQty > 0 {
+		neededPackaging += req.PackagingQty
+	}
+	if neededPackaging > 0 {
 		var pkgCount int
 		_ = tx.QueryRow(ctx, `SELECT count(*) FROM packagings`).Scan(&pkgCount)
 
@@ -877,10 +885,10 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 			return model.Order{}, err
 		}
 		// Hanya tolak jika belum ada sistem multi-packaging sama sekali
-		if pkgCount == 0 && totalQty > stock {
+		if pkgCount == 0 && neededPackaging > stock {
 			return model.Order{}, ErrOutOfPackaging
 		}
-		newLegacyStock := stock - totalQty
+		newLegacyStock := stock - neededPackaging
 		if newLegacyStock < 0 {
 			newLegacyStock = 0
 		}
@@ -961,9 +969,9 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO orders (id, number, order_type, table_no, subtotal, packaging_fee_total, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'paid', $14, $15, $16)`,
-		id, number, req.OrderType, req.TableNo, subtotal, packagingFeeTotal, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
+		`INSERT INTO orders (id, number, order_type, table_no, subtotal, packaging_fee_total, packaging_qty, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'paid', $15, $16, $17)`,
+		id, number, req.OrderType, req.TableNo, subtotal, packagingFeeTotal, req.PackagingQty, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
 		return model.Order{}, err
 	}
 
@@ -997,6 +1005,7 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		Items:             items,
 		Subtotal:          subtotal,
 		PackagingFeeTotal: packagingFeeTotal,
+		PackagingQty:      req.PackagingQty,
 		DiscountType:      req.DiscountType,
 		DiscountValue:     req.DiscountValue,
 		DiscountAmount:    discount,

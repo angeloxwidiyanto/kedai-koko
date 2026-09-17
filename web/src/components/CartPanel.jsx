@@ -128,16 +128,16 @@ export default function CartPanel({ onCheckout }) {
         )}
       </div>
 
-      {/* Tombol kemasan cepat — muncul jika dine-in atau sudah ada item di keranjang */}
+      {/* Tombol kemasan cepat — muncul jika dine-in (gratis) */}
       {cartItems.length > 0 && orderType === 'dine_in' && (
         <div className="quick-packaging-bar">
           <button
             type="button"
-            className="btn quick-packaging-btn"
-            onClick={() => addQuickPackaging(1)}
+            className="btn quick-packaging-btn free"
+            onClick={() => addQuickPackaging(1, 0)}
           >
             <span className="material-symbols-outlined">add</span>
-            Kemasan Tambahan (+{rupiah(packagingFee)})
+            Kemasan Tambahan (Gratis)
           </button>
         </div>
       )}

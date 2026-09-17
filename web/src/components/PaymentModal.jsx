@@ -36,7 +36,9 @@ export default function PaymentModal({ onClose, onDone }) {
   }, [orderType])
 
   const totalQty = useMemo(() => cartItems.filter((i) => !i.isQuickPackaging).reduce((s, i) => s + i.qty, 0), [cartItems])
-  const quickPackagingTotal = useMemo(() => cartItems.filter((i) => i.isQuickPackaging).reduce((s, i) => s + i.price * i.qty, 0), [cartItems])
+  const quickPackagingItems = useMemo(() => cartItems.filter((i) => i.isQuickPackaging), [cartItems])
+  const quickPackagingTotal = useMemo(() => quickPackagingItems.reduce((s, i) => s + i.price * i.qty, 0), [quickPackagingItems])
+  const quickPackagingQty = useMemo(() => quickPackagingItems.reduce((s, i) => s + i.qty, 0), [quickPackagingItems])
 
   // Hitung kebutuhan multi-kemasan berdasarkan produk di keranjang
   const packagingStatus = useMemo(() => {
@@ -116,8 +118,8 @@ export default function PaymentModal({ onClose, onDone }) {
     setErr(null)
     try {
       const regularItems = cartItems.filter((i) => !i.isQuickPackaging)
-      const quickPackagingItems = cartItems.filter((i) => i.isQuickPackaging)
-      const packagingFeeTotal = quickPackagingItems.reduce((sum, i) => sum + i.price * i.qty, 0)
+      const packagingFeeTotal = quickPackagingTotal
+      const packagingQty = quickPackagingQty
 
       const order = await createOrder(
         {
@@ -129,6 +131,7 @@ export default function PaymentModal({ onClose, onDone }) {
           discountType: discType || '',
           discountValue: discValue || 0,
           packagingFeeTotal,
+          packagingQty,
         },
         { cashier: user, products }
       )
@@ -245,12 +248,17 @@ export default function PaymentModal({ onClose, onDone }) {
           <span>Subtotal</span>
           <span>{rupiah(subtotal)}</span>
         </div>
-        {quickPackagingTotal > 0 && (
+        {quickPackagingTotal > 0 ? (
           <div className="pay-total pay-packaging">
-            <span>📦 Biaya Kemasan</span>
+            <span>📦 Biaya Kemasan ({quickPackagingQty}x)</span>
             <span>{rupiah(quickPackagingTotal)}</span>
           </div>
-        )}
+        ) : quickPackagingQty > 0 ? (
+          <div className="pay-total pay-packaging">
+            <span>📦 Kemasan Tambahan ({quickPackagingQty}x)</span>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>GRATIS</span>
+          </div>
+        ) : null}
         {discountAmount > 0 && (
           <div className="pay-total pay-discount">
             <span>Diskon</span>

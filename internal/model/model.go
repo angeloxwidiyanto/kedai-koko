@@ -72,6 +72,7 @@ type Order struct {
 	Items             []OrderItem `json:"items"`
 	Subtotal          int         `json:"subtotal"`
 	PackagingFeeTotal int         `json:"packagingFeeTotal,omitempty"`
+	PackagingQty      int         `json:"packagingQty,omitempty"`
 	DiscountType      string      `json:"discountType,omitempty"`
 	DiscountValue     int         `json:"discountValue,omitempty"`
 	DiscountAmount    int         `json:"discountAmount"`
@@ -103,6 +104,7 @@ type CreateOrderRequest struct {
 	DiscountType      string           `json:"discountType,omitempty"`
 	DiscountValue     int              `json:"discountValue,omitempty"`
 	PackagingFeeTotal int              `json:"packagingFeeTotal,omitempty"`
+	PackagingQty      int              `json:"packagingQty,omitempty"`
 	ClientOrderID     string           `json:"clientOrderId,omitempty"`
 	CreatedAt         *time.Time       `json:"createdAt,omitempty"`
 }

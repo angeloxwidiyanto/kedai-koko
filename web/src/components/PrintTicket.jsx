@@ -44,6 +44,14 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
         </div>
       ))}
 
+      {order.packagingQty > 0 && !isReceipt && (
+        <div className="pt-item" style={{ fontStyle: 'italic' }}>
+          <div className="pt-line">
+            <span className="pt-name">* Kemasan: {order.packagingQty} pcs</span>
+          </div>
+        </div>
+      )}
+
       {isReceipt ? (
         <>
           <div className="pt-rule" />
@@ -51,6 +59,18 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
             <span>Subtotal</span>
             <span>{rupiah(order.subtotal || order.total)}</span>
           </div>
+          {order.packagingFeeTotal > 0 && (
+            <div className="pt-row">
+              <span>Biaya Kemasan{order.packagingQty ? ` (${order.packagingQty}x)` : ''}</span>
+              <span>{rupiah(order.packagingFeeTotal)}</span>
+            </div>
+          )}
+          {order.packagingQty > 0 && (!order.packagingFeeTotal || order.packagingFeeTotal === 0) && (
+            <div className="pt-row">
+              <span>Kemasan ({order.packagingQty}x)</span>
+              <span style={{ fontWeight: 600 }}>GRATIS</span>
+            </div>
+          )}
           {order.discountAmount > 0 && (
             <div className="pt-row">
               <span>Diskon</span>
