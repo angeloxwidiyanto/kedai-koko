@@ -52,7 +52,7 @@ func TestPackagingConsumedPerItem(t *testing.T) {
 
 	// bungkus 3 item -> sisa 2
 	o, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("drinks-1", 1, "")},
+		Items:     []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("tea-1", 1, "")},
 		Paid:      100000,
 		OrderType: "take_away",
 		PaymentMethod: "tunai",

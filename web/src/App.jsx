@@ -163,7 +163,9 @@ function Shell() {
           {page === 'menu' && (
             <MenuPage onCheckout={handleCheckout} onToast={showToast} />
           )}
-          {page === 'history' && <HistoryPage onPrint={handlePrint} />}
+          {page === 'history' && (
+            <HistoryPage onPrint={handlePrint} onNav={setPage} onToast={showToast} />
+          )}
           {page === 'help' && <HelpPage />}
           {page === 'admin' && <AdminPage onToast={showToast} />}
         </motion.main>

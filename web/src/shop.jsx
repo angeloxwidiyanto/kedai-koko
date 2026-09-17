@@ -287,6 +287,27 @@ export function ShopProvider({ children }) {
     setTableNo('')
   }, [])
 
+  const loadOrderToCart = useCallback((order) => {
+    if (!order || !Array.isArray(order.items) || order.items.length === 0) return false
+    const nextCart = {}
+    order.items.forEach((it, idx) => {
+      const pId = it.productId
+      const cartItemId = `${pId}_${Date.now()}_${idx}`
+      nextCart[cartItemId] = {
+        cartItemId,
+        productId: pId,
+        qty: Number(it.qty) || 1,
+        note: it.note || '',
+      }
+    })
+    setCart(nextCart)
+    if (order.orderType) {
+      setOrderType(order.orderType)
+    }
+    setTableNo(order.tableNo || '')
+    return true
+  }, [])
+
   const getProductQty = useCallback(
     (productId) =>
       Object.values(cart)
@@ -332,6 +353,7 @@ export function ShopProvider({ children }) {
     setNote,
     getProductQty,
     clear,
+    loadOrderToCart,
     orderType,
     setOrderType,
     tableNo,

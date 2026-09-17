@@ -1301,7 +1301,9 @@ button {
 .order-card-bottom {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .order-time {
   color: var(--on-surface-variant);
@@ -1515,7 +1517,8 @@ button {
 .order-card-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .reprint-btn {
   display: inline-flex;
@@ -2803,6 +2806,22 @@ button {
 .void-btn {
   color: var(--error);
   border-color: var(--error);
+}
+.edit-order-btn {
+  color: var(--primary, #9e3d00);
+  border-color: var(--primary, #9e3d00);
+  background: var(--surface-low);
+}
+.edit-order-btn:hover {
+  background: var(--surface);
+}
+.recart-btn {
+  color: var(--on-surface);
+  border-color: var(--outline-variant);
+  background: var(--surface-low);
+}
+.recart-btn:hover {
+  background: var(--surface);
 }
 
 /* ===== Hour grid ===== */

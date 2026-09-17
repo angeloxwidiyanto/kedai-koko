@@ -5,8 +5,8 @@ import { getPendingOrders } from '../lib/offlineSync'
 import { rupiah, timeID } from '../lib/format'
 import { useShop } from '../shop'
 
-export default function HistoryPage({ onPrint }) {
-  const { role } = useShop()
+export default function HistoryPage({ onPrint, onNav, onToast }) {
+  const { role, loadOrderToCart, count } = useShop()
   const [orders, setOrders] = useState(null)
   const [offlineOrders, setOfflineOrders] = useState([])
   const [error, setError] = useState(null)
@@ -59,6 +59,44 @@ export default function HistoryPage({ onPrint }) {
     } finally {
       setVoiding(null)
     }
+  }
+
+  async function handleEditOrder(order) {
+    if (count > 0) {
+      const ok = window.confirm(
+        `Keranjang belanja saat ini berisi ${count} item. Batalkan pesanan ${order.number} dan ganti isi keranjang dengan pesanan ini untuk diedit?`
+      )
+      if (!ok) return
+    } else {
+      const ok = window.confirm(
+        `Batalkan pesanan ${order.number} dan kembalikan item ke keranjang untuk diedit?`
+      )
+      if (!ok) return
+    }
+
+    setVoiding(order.id)
+    try {
+      await voidOrder(order.id, 'Koreksi pesanan')
+      loadOrderToCart(order)
+      if (onToast) onToast(`Pesanan ${order.number} dibatalkan & item dimuat ke keranjang`)
+      if (onNav) onNav('menu')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setVoiding(null)
+    }
+  }
+
+  function handleCopyOrder(order) {
+    if (count > 0) {
+      const ok = window.confirm(
+        `Keranjang belanja saat ini sudah berisi ${count} item. Ganti isi keranjang dengan pesanan ${order.number}?`
+      )
+      if (!ok) return
+    }
+    loadOrderToCart(order)
+    if (onToast) onToast(`Item pesanan ${order.number} disalin ke keranjang`)
+    if (onNav) onNav('menu')
   }
 
   return (
@@ -116,7 +154,7 @@ export default function HistoryPage({ onPrint }) {
                     {o.cashierName ? ` · ${o.cashierName}` : ''}
                   </span>
                   <div className="order-card-right">
-                    {!isVoid && (
+                    {!isVoid ? (
                       <>
                         <button type="button" className="reprint-btn" onClick={() => onPrint(o, 'kitchen')}>
                           <span className="material-symbols-outlined">print</span>
@@ -127,17 +165,39 @@ export default function HistoryPage({ onPrint }) {
                           Struk
                         </button>
                         {!o.isOffline && (
-                          <button
-                            type="button"
-                            className="reprint-btn void-btn"
-                            onClick={() => doVoid(o)}
-                            disabled={voiding === o.id}
-                          >
-                            <span className="material-symbols-outlined">block</span>
-                            Batalkan
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="reprint-btn edit-order-btn"
+                              title="Batalkan nota ini dan kembalikan item ke keranjang untuk diperbaiki"
+                              onClick={() => handleEditOrder(o)}
+                              disabled={voiding === o.id}
+                            >
+                              <span className="material-symbols-outlined">edit_note</span>
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="reprint-btn void-btn"
+                              onClick={() => doVoid(o)}
+                              disabled={voiding === o.id}
+                            >
+                              <span className="material-symbols-outlined">block</span>
+                              Batalkan
+                            </button>
+                          </>
                         )}
                       </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="reprint-btn recart-btn"
+                        title="Muat kembali item pesanan yang dibatalkan ini ke keranjang"
+                        onClick={() => handleCopyOrder(o)}
+                      >
+                        <span className="material-symbols-outlined">add_shopping_cart</span>
+                        Ke Keranjang
+                      </button>
                     )}
                     <span className="order-total">{rupiah(o.total)}</span>
                   </div>

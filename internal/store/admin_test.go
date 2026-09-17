@@ -14,7 +14,7 @@ func TestReportAggregates(t *testing.T) {
 	from := now.Add(-24 * time.Hour)
 	to := now.Add(24 * time.Hour)
 
-	if _, err := mkOrder(s, []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("drinks-1", 1, "")}, 100000, "", 0); err != nil {
+	if _, err := mkOrder(s, []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("tea-1", 1, "")}, 100000, "", 0); err != nil {
 		t.Fatalf("CreateOrder 1: %v", err)
 	}
 	if _, err := mkOrder(s, []model.OrderItemInput{itemReq("rice-1", 1, "")}, 30000, "", 0); err != nil {
@@ -26,7 +26,7 @@ func TestReportAggregates(t *testing.T) {
 		t.Fatalf("Report: %v", err)
 	}
 
-	wantTotal := (2*30000 + 8000) + 30000 // 98000
+	wantTotal := (2*30000 + 20000) + 30000 // 110000
 	if r.TotalRevenue != wantTotal {
 		t.Fatalf("TotalRevenue: want %d got %d", wantTotal, r.TotalRevenue)
 	}

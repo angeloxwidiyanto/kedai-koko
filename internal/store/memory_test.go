@@ -45,22 +45,22 @@ func TestCreateOrderCalculatesTotalAndChange(t *testing.T) {
 	s := newTestStore()
 
 	order, err := mkOrder(s, []model.OrderItemInput{
-		itemReq("rice-1", 2, ""),   // 30000 * 2
-		itemReq("drinks-1", 3, ""), // 8000 * 3
-	}, 100000, "", 0)
+		itemReq("rice-1", 2, ""), // 30000 * 2
+		itemReq("tea-1", 3, ""),  // 20000 * 3
+	}, 150000, "", 0)
 	if err != nil {
 		t.Fatalf("CreateOrder error: %v", err)
 	}
 
-	wantTotal := 2*30000 + 3*8000 // 84000
+	wantTotal := 2*30000 + 3*20000 // 120000
 	if order.Total != wantTotal {
 		t.Fatalf("expected total %d, got %d", wantTotal, order.Total)
 	}
 	if order.Subtotal != wantTotal {
 		t.Fatalf("expected subtotal %d, got %d", wantTotal, order.Subtotal)
 	}
-	if order.Change != 100000-wantTotal {
-		t.Fatalf("expected change %d, got %d", 100000-wantTotal, order.Change)
+	if order.Change != 150000-wantTotal {
+		t.Fatalf("expected change %d, got %d", 150000-wantTotal, order.Change)
 	}
 	if order.Status != "paid" {
 		t.Fatalf("expected status paid, got %s", order.Status)
@@ -72,7 +72,7 @@ func TestCreateOrderCalculatesTotalAndChange(t *testing.T) {
 
 func TestCreateOrderPreservesNote(t *testing.T) {
 	s := newTestStore()
-	order, err := mkOrder(s, []model.OrderItemInput{itemReq("drinks-3", 1, "kurang gula, tanpa es")}, 20000, "", 0)
+	order, err := mkOrder(s, []model.OrderItemInput{itemReq("tea-1", 1, "kurang gula, tanpa es")}, 20000, "", 0)
 	if err != nil {
 		t.Fatalf("CreateOrder error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestDiscount(t *testing.T) {
 		}
 	})
 	t.Run("amount capped at subtotal", func(t *testing.T) {
-		o, err := mkOrder(s, []model.OrderItemInput{itemReq("drinks-5", 1, "")}, 5000, "amt", 99999)
+		o, err := mkOrder(s, []model.OrderItemInput{itemReq("others-4", 1, "")}, 15000, "amt", 99999)
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
