@@ -20,8 +20,29 @@ type Product struct {
 	Tags        []string `json:"tags,omitempty"`
 	Available   bool     `json:"available"`
 	Archived    bool     `json:"archived"`
-	ImageURL    string   `json:"imageUrl,omitempty"`
-	Stock       int      `json:"stock"`
+	ImageURL      string   `json:"imageUrl,omitempty"`
+	Stock         int      `json:"stock"`
+	PackagingID   string   `json:"packagingId,omitempty"`
+	PackagingRule string   `json:"packagingRule,omitempty"`
+}
+
+type Packaging struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Stock     int       `json:"stock"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+type PackagingLog struct {
+	ID            int64     `json:"id"`
+	PackagingID   string    `json:"packagingId"`
+	PackagingName string    `json:"packagingName,omitempty"`
+	OrderID       string    `json:"orderId,omitempty"`
+	OrderNumber   string    `json:"orderNumber,omitempty"`
+	ChangeAmount  int       `json:"changeAmount"`
+	BalanceAfter  int       `json:"balanceAfter"`
+	Reason        string    `json:"reason"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 type User struct {

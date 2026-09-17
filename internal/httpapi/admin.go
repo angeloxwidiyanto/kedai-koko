@@ -302,3 +302,130 @@ func HandleSetPackaging(w http.ResponseWriter, r *http.Request) {
 	stock, _ := store.Default.GetPackagingStock()
 	writeJSON(w, http.StatusOK, map[string]int{"stock": stock})
 }
+
+func HandleGetPackagings(w http.ResponseWriter, r *http.Request) {
+	if !authorized(r) {
+		writeError(w, http.StatusUnauthorized, "tidak diizinkan")
+		return
+	}
+	pkgs, err := store.Default.Packagings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "gagal mengambil daftar kemasan")
+		return
+	}
+	writeJSON(w, http.StatusOK, pkgs)
+}
+
+func HandleCreatePackaging(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	var p model.Packaging
+	if !decodeBody(w, r, &p) {
+		return
+	}
+	if p.Name == "" {
+		writeError(w, http.StatusBadRequest, "nama kemasan wajib diisi")
+		return
+	}
+	created, err := store.Default.CreatePackaging(p)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func HandleUpdatePackaging(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	var p model.Packaging
+	if !decodeBody(w, r, &p) {
+		return
+	}
+	p.ID = r.PathValue("id")
+	if p.Name == "" {
+		writeError(w, http.StatusBadRequest, "nama kemasan wajib diisi")
+		return
+	}
+	updated, err := store.Default.UpdatePackaging(p)
+	if err != nil {
+		if errors.Is(err, store.ErrPackagingNotFound) {
+			writeError(w, http.StatusNotFound, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func HandleDeletePackaging(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	id := r.PathValue("id")
+	if err := store.Default.DeletePackaging(id); err != nil {
+		if errors.Is(err, store.ErrPackagingNotFound) {
+			writeError(w, http.StatusNotFound, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "dihapus"})
+}
+
+func HandleAdjustPackaging(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	id := r.PathValue("id")
+	var req struct {
+		Change int    `json:"change"`
+		Reason string `json:"reason"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Change == 0 {
+		writeError(w, http.StatusBadRequest, "jumlah perubahan tidak boleh 0")
+		return
+	}
+	if req.Reason == "" {
+		req.Reason = "Penyesuaian manual"
+	}
+	if err := store.Default.AdjustPackaging(id, req.Change, req.Reason, "", ""); err != nil {
+		if errors.Is(err, store.ErrPackagingNotFound) {
+			writeError(w, http.StatusNotFound, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func HandlePackagingLogs(w http.ResponseWriter, r *http.Request) {
+	if !authorizedAdmin(r) {
+		writeError(w, http.StatusUnauthorized, "khusus admin")
+		return
+	}
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	logs, err := store.Default.PackagingLogs(limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "gagal mengambil log kemasan")
+		return
+	}
+	writeJSON(w, http.StatusOK, logs)
+}

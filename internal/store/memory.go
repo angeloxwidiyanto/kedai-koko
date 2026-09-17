@@ -12,19 +12,22 @@ import (
 type MemoryStore struct {
 	mu         sync.Mutex
 	products   []model.Product
-	categories []model.Category
-	orders     []model.Order
-	users      []model.User
-	counter    int
-	packaging  int
+	categories    []model.Category
+	packagings    []model.Packaging
+	packagingLogs []model.PackagingLog
+	orders        []model.Order
+	users         []model.User
+	counter       int
+	packaging     int
 }
 
 func NewMemory() *MemoryStore {
 	s := &MemoryStore{
-		products:   append([]model.Product(nil), defaultProducts...),
-		categories: append([]model.Category(nil), defaultCategories...),
-		orders:     sampleOrders(time.Now()),
-		packaging:  100,
+		products:      append([]model.Product(nil), defaultProducts...),
+		categories:    append([]model.Category(nil), defaultCategories...),
+		packagings:    append([]model.Packaging(nil), defaultPackagings...),
+		orders:        sampleOrders(time.Now()),
+		packaging:     100,
 	}
 	s.counter = len(s.orders)
 	s.seedAdmin()
@@ -489,12 +492,8 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		}
 	}
 
-	// kurangi stok kemasan untuk take away
-	if req.OrderType == "take_away" {
-		s.packaging -= totalQty
-	}
-
 	s.counter++
+	orderNumber := fmt.Sprintf("KK-%04d", s.counter)
 	id := req.ClientOrderID
 	if id == "" {
 		id = fmt.Sprintf("ord-%d", time.Now().UnixNano())
@@ -503,9 +502,51 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	if req.CreatedAt != nil && !req.CreatedAt.IsZero() {
 		now = *req.CreatedAt
 	}
+
+	// kurangi stok kemasan untuk take away (legacy)
+	if req.OrderType == "take_away" {
+		s.packaging -= totalQty
+	}
+
+	// Catat pemakaian multi-kemasan
+	for _, it := range items {
+		idx := s.indexOfProduct(it.ProductID)
+		if idx >= 0 && s.products[idx].PackagingID != "" {
+			rule := s.products[idx].PackagingRule
+			if rule == "" {
+				rule = "take_away_only"
+			}
+			needs := false
+			if rule == "always" {
+				needs = true
+			} else if req.OrderType == "take_away" && rule == "take_away_only" {
+				needs = true
+			}
+			if needs {
+				pkgID := s.products[idx].PackagingID
+				for pIdx := range s.packagings {
+					if s.packagings[pIdx].ID == pkgID {
+						s.packagings[pIdx].Stock -= it.Qty
+						s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+							ID:           int64(len(s.packagingLogs) + 1),
+							PackagingID:  pkgID,
+							OrderID:      id,
+							OrderNumber:  orderNumber,
+							ChangeAmount: -it.Qty,
+							BalanceAfter: s.packagings[pIdx].Stock,
+							Reason:       "order",
+							CreatedAt:    now,
+						})
+						break
+					}
+				}
+			}
+		}
+	}
+
 	order := model.Order{
 		ID:             id,
-		Number:         fmt.Sprintf("KK-%04d", s.counter),
+		Number:         orderNumber,
 		OrderType:      req.OrderType,
 		TableNo:        req.TableNo,
 		Items:          items,
@@ -559,12 +600,49 @@ func (s *MemoryStore) VoidOrder(id, reason, by string) (model.Order, error) {
 					}
 				}
 			}
-			// kembalikan stok kemasan untuk bungkus
+			// kembalikan stok kemasan untuk bungkus (legacy)
 			if s.orders[i].OrderType == "take_away" {
 				for _, it := range s.orders[i].Items {
 					s.packaging += it.Qty
 				}
 			}
+
+			// kembalikan stok multi-kemasan
+			for _, it := range s.orders[i].Items {
+				idx := s.indexOfProduct(it.ProductID)
+				if idx >= 0 && s.products[idx].PackagingID != "" {
+					rule := s.products[idx].PackagingRule
+					if rule == "" {
+						rule = "take_away_only"
+					}
+					needs := false
+					if rule == "always" {
+						needs = true
+					} else if s.orders[i].OrderType == "take_away" && rule == "take_away_only" {
+						needs = true
+					}
+					if needs {
+						pkgID := s.products[idx].PackagingID
+						for pIdx := range s.packagings {
+							if s.packagings[pIdx].ID == pkgID {
+								s.packagings[pIdx].Stock += it.Qty
+								s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+									ID:           int64(len(s.packagingLogs) + 1),
+									PackagingID:  pkgID,
+									OrderID:      s.orders[i].ID,
+									OrderNumber:  s.orders[i].Number,
+									ChangeAmount: it.Qty,
+									BalanceAfter: s.packagings[pIdx].Stock,
+									Reason:       "void_restored",
+									CreatedAt:    now,
+								})
+								break
+							}
+						}
+					}
+				}
+			}
+
 			return s.orders[i], nil
 		}
 	}
@@ -768,6 +846,116 @@ func (s *MemoryStore) SetPackagingStock(n int) error {
 	}
 	s.packaging = n
 	return nil
+}
+
+func (s *MemoryStore) Packagings() ([]model.Packaging, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]model.Packaging(nil), s.packagings...), nil
+}
+
+func (s *MemoryStore) CreatePackaging(p model.Packaging) (model.Packaging, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p.ID == "" {
+		p.ID = fmt.Sprintf("pkg-%d", time.Now().UnixNano())
+	}
+	p.CreatedAt = time.Now()
+	s.packagings = append(s.packagings, p)
+	if p.Stock > 0 {
+		s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+			ID:           int64(len(s.packagingLogs) + 1),
+			PackagingID:  p.ID,
+			ChangeAmount: p.Stock,
+			BalanceAfter: p.Stock,
+			Reason:       "Stok Awal",
+			CreatedAt:    p.CreatedAt,
+		})
+	}
+	return p, nil
+}
+
+func (s *MemoryStore) UpdatePackaging(p model.Packaging) (model.Packaging, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.packagings {
+		if s.packagings[i].ID == p.ID {
+			diff := p.Stock - s.packagings[i].Stock
+			s.packagings[i].Name = p.Name
+			s.packagings[i].Stock = p.Stock
+			if diff != 0 {
+				s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+					ID:           int64(len(s.packagingLogs) + 1),
+					PackagingID:  p.ID,
+					ChangeAmount: diff,
+					BalanceAfter: p.Stock,
+					Reason:       "Penyesuaian manual",
+					CreatedAt:    time.Now(),
+				})
+			}
+			return s.packagings[i], nil
+		}
+	}
+	return model.Packaging{}, ErrPackagingNotFound
+}
+
+func (s *MemoryStore) DeletePackaging(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.packagings {
+		if s.packagings[i].ID == id {
+			s.packagings = append(s.packagings[:i], s.packagings[i+1:]...)
+			return nil
+		}
+	}
+	return ErrPackagingNotFound
+}
+
+func (s *MemoryStore) AdjustPackaging(id string, change int, reason, orderID, orderNumber string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.packagings {
+		if s.packagings[i].ID == id {
+			s.packagings[i].Stock += change
+			s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+				ID:           int64(len(s.packagingLogs) + 1),
+				PackagingID:  id,
+				OrderID:      orderID,
+				OrderNumber:  orderNumber,
+				ChangeAmount: change,
+				BalanceAfter: s.packagings[i].Stock,
+				Reason:       reason,
+				CreatedAt:    time.Now(),
+			})
+			return nil
+		}
+	}
+	return ErrPackagingNotFound
+}
+
+func (s *MemoryStore) PackagingLogs(limit int) ([]model.PackagingLog, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	out := make([]model.PackagingLog, 0, len(s.packagingLogs))
+	pMap := make(map[string]string)
+	for _, p := range s.packagings {
+		pMap[p.ID] = p.Name
+	}
+	for i := len(s.packagingLogs) - 1; i >= 0; i-- {
+		l := s.packagingLogs[i]
+		l.PackagingName = pMap[l.PackagingID]
+		if l.PackagingName == "" {
+			l.PackagingName = l.PackagingID
+		}
+		out = append(out, l)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }
 
 func (s *MemoryStore) Ping() error { return nil }

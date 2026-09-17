@@ -133,6 +133,24 @@ func (s *SQLStore) migrate(ctx context.Context) error {
 			key text PRIMARY KEY,
 			value text NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS packagings (
+			id text PRIMARY KEY,
+			name text NOT NULL,
+			stock int NOT NULL DEFAULT 0,
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`,
+		`CREATE TABLE IF NOT EXISTS packaging_logs (
+			id bigserial PRIMARY KEY,
+			packaging_id text NOT NULL,
+			order_id text NOT NULL DEFAULT '',
+			order_number text NOT NULL DEFAULT '',
+			change_amount int NOT NULL,
+			balance_after int NOT NULL,
+			reason text NOT NULL DEFAULT '',
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_id text NOT NULL DEFAULT ''`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_rule text NOT NULL DEFAULT 'take_away_only'`,
 	}
 
 	for _, st := range stmts {
@@ -150,10 +168,14 @@ func (s *SQLStore) seed(ctx context.Context) error {
 	}
 	if productCount == 0 {
 		for _, p := range defaultProducts {
+			rule := p.PackagingRule
+			if rule == "" {
+				rule = "take_away_only"
+			}
 			if _, err := s.pool.Exec(ctx,
-				`INSERT INTO products (id, name, category, price, description, emoji, color, tags, available, stock)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-				p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, p.Available, p.Stock); err != nil {
+				`INSERT INTO products (id, name, category, price, description, emoji, color, tags, available, stock, packaging_id, packaging_rule)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+				p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, p.Available, p.Stock, p.PackagingID, rule); err != nil {
 				return err
 			}
 		}
@@ -177,7 +199,29 @@ func (s *SQLStore) seed(ctx context.Context) error {
 	// Normalisasi data lama: status "Selesai" -> "paid"
 	_, _ = s.pool.Exec(ctx, `UPDATE orders SET status='paid' WHERE status='Selesai'`)
 
-	// Seed stok kemasan (hanya jika belum ada)
+	// Seed kemasan jika belum ada
+	var packagingCount int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM packagings`).Scan(&packagingCount); err != nil {
+		return err
+	}
+	if packagingCount == 0 {
+		for _, pkg := range defaultPackagings {
+			_, err := s.pool.Exec(ctx,
+				`INSERT INTO packagings (id, name, stock, created_at) VALUES ($1, $2, $3, now())`,
+				pkg.ID, pkg.Name, pkg.Stock)
+			if err != nil {
+				return err
+			}
+			if pkg.Stock > 0 {
+				_, _ = s.pool.Exec(ctx,
+					`INSERT INTO packaging_logs (packaging_id, change_amount, balance_after, reason, created_at)
+					 VALUES ($1, $2, $3, 'Stok Awal', now())`,
+					pkg.ID, pkg.Stock, pkg.Stock)
+			}
+		}
+	}
+
+	// Seed stok kemasan legacy (hanya jika belum ada)
 	var packCount int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM settings WHERE key='packaging_stock'`).Scan(&packCount); err != nil {
 		return err
@@ -231,11 +275,11 @@ func (s *SQLStore) Categories() ([]model.Category, error) {
 	return out, rows.Err()
 }
 
-const productCols = `id, name, category, price, description, emoji, color, tags, available, archived, image_url, stock`
+const productCols = `id, name, category, price, description, emoji, color, tags, available, archived, image_url, stock, COALESCE(packaging_id, ''), COALESCE(packaging_rule, 'take_away_only')`
 
 func scanProduct(row pgx.Row) (model.Product, error) {
 	var p model.Product
-	err := row.Scan(&p.ID, &p.Name, &p.Category, &p.Price, &p.Description, &p.Emoji, &p.Color, &p.Tags, &p.Available, &p.Archived, &p.ImageURL, &p.Stock)
+	err := row.Scan(&p.ID, &p.Name, &p.Category, &p.Price, &p.Description, &p.Emoji, &p.Color, &p.Tags, &p.Available, &p.Archived, &p.ImageURL, &p.Stock, &p.PackagingID, &p.PackagingRule)
 	return p, err
 }
 
@@ -304,6 +348,9 @@ func (s *SQLStore) CreateProduct(p model.Product) (model.Product, error) {
 	if p.Stock == 0 {
 		p.Stock = -1
 	}
+	if p.PackagingRule == "" {
+		p.PackagingRule = "take_away_only"
+	}
 	var exists bool
 	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)`, p.ID).Scan(&exists); err != nil {
 		return model.Product{}, err
@@ -314,9 +361,9 @@ func (s *SQLStore) CreateProduct(p model.Product) (model.Product, error) {
 
 	available := p.Stock != 0
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO products (id, name, category, price, description, emoji, color, tags, available, archived, image_url, stock)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10, $11)`,
-		p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, available, p.ImageURL, p.Stock)
+		`INSERT INTO products (id, name, category, price, description, emoji, color, tags, available, archived, image_url, stock, packaging_id, packaging_rule)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10, $11, $12, $13)`,
+		p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, available, p.ImageURL, p.Stock, p.PackagingID, p.PackagingRule)
 	if err != nil {
 		return model.Product{}, err
 	}
@@ -327,10 +374,13 @@ func (s *SQLStore) CreateProduct(p model.Product) (model.Product, error) {
 
 func (s *SQLStore) UpdateProduct(p model.Product) (model.Product, error) {
 	ctx := context.Background()
+	if p.PackagingRule == "" {
+		p.PackagingRule = "take_away_only"
+	}
 	tag, err := s.pool.Exec(ctx,
-		`UPDATE products SET name=$2, category=$3, price=$4, description=$5, emoji=$6, color=$7, tags=$8, image_url=$9
+		`UPDATE products SET name=$2, category=$3, price=$4, description=$5, emoji=$6, color=$7, tags=$8, image_url=$9, packaging_id=$10, packaging_rule=$11
 		 WHERE id=$1`,
-		p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, p.ImageURL)
+		p.ID, p.Name, p.Category, p.Price, p.Description, p.Emoji, p.Color, p.Tags, p.ImageURL, p.PackagingID, p.PackagingRule)
 	if err != nil {
 		return model.Product{}, err
 	}
@@ -722,7 +772,7 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	}
 
 	rows, err := tx.Query(ctx,
-		`SELECT id, name, emoji, price, available, archived, stock FROM products WHERE id = ANY($1::text[]) FOR UPDATE`, ids)
+		`SELECT id, name, emoji, price, available, archived, stock, COALESCE(packaging_id, ''), COALESCE(packaging_rule, 'take_away_only') FROM products WHERE id = ANY($1::text[]) FOR UPDATE`, ids)
 	if err != nil {
 		return model.Order{}, err
 	}
@@ -733,11 +783,13 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		available       bool
 		archived        bool
 		stock           int
+		packagingID     string
+		packagingRule   string
 	}
 	products := map[string]productRow{}
 	for rows.Next() {
 		var pr productRow
-		if err := rows.Scan(&pr.id, &pr.name, &pr.emoji, &pr.price, &pr.available, &pr.archived, &pr.stock); err != nil {
+		if err := rows.Scan(&pr.id, &pr.name, &pr.emoji, &pr.price, &pr.available, &pr.archived, &pr.stock, &pr.packagingID, &pr.packagingRule); err != nil {
 			rows.Close()
 			return model.Order{}, err
 		}
@@ -792,7 +844,7 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		return model.Order{}, ErrPaymentShort
 	}
 
-	// stok kemasan untuk take away (per satuan item), atomic
+	// stok kemasan untuk take away (legacy setting)
 	if req.OrderType == "take_away" {
 		var stock int
 		err := tx.QueryRow(ctx,
@@ -810,6 +862,47 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 			 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
 			fmt.Sprintf("%d", stock-totalQty)); err != nil {
 			return model.Order{}, err
+		}
+	}
+
+	// Hitung kebutuhan multi-kemasan per packaging_id
+	pkgNeeded := make(map[string]int)
+	for _, it := range items {
+		pr := products[it.ProductID]
+		if pr.packagingID != "" {
+			rule := pr.packagingRule
+			if rule == "" {
+				rule = "take_away_only"
+			}
+			needs := false
+			if rule == "always" {
+				needs = true
+			} else if req.OrderType == "take_away" && rule == "take_away_only" {
+				needs = true
+			}
+			if needs {
+				pkgNeeded[pr.packagingID] += it.Qty
+			}
+		}
+	}
+
+	// Deduct and lock multi-packagings
+	type pkgUpdate struct {
+		id           string
+		needed       int
+		balanceAfter int
+	}
+	var pkgUpdates []pkgUpdate
+	for pID, needed := range pkgNeeded {
+		var curStock int
+		err := tx.QueryRow(ctx, `SELECT stock FROM packagings WHERE id=$1 FOR UPDATE`, pID).Scan(&curStock)
+		if err == nil {
+			// Kurangi stok walau minus atau update balance
+			newStock := curStock - needed
+			if _, err := tx.Exec(ctx, `UPDATE packagings SET stock=$2 WHERE id=$1`, pID, newStock); err != nil {
+				return model.Order{}, err
+			}
+			pkgUpdates = append(pkgUpdates, pkgUpdate{id: pID, needed: needed, balanceAfter: newStock})
 		}
 	}
 
@@ -852,6 +945,15 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 			`INSERT INTO order_items (order_id, product_id, name, emoji, price, qty, note)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 			id, it.ProductID, it.Name, it.Emoji, it.Price, it.Qty, it.Note); err != nil {
+			return model.Order{}, err
+		}
+	}
+
+	for _, pu := range pkgUpdates {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO packaging_logs (packaging_id, order_id, order_number, change_amount, balance_after, reason, created_at)
+			 VALUES ($1, $2, $3, $4, $5, 'order', $6)`,
+			pu.id, id, number, -pu.needed, pu.balanceAfter, now); err != nil {
 			return model.Order{}, err
 		}
 	}
@@ -899,9 +1001,9 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 		return model.Order{}, ErrOrderNotPaid
 	}
 
-	// ambil jenis pesanan untuk kembalikan kemasan
-	var orderType string
-	_ = tx.QueryRow(ctx, `SELECT order_type FROM orders WHERE id=$1`, id).Scan(&orderType)
+	// ambil jenis pesanan dan nomor pesanan untuk kembalikan kemasan
+	var orderType, orderNumber string
+	_ = tx.QueryRow(ctx, `SELECT order_type, number FROM orders WHERE id=$1`, id).Scan(&orderType, &orderNumber)
 
 	// kembalikan stok
 	itemRows, err := tx.Query(ctx, `SELECT product_id, qty FROM order_items WHERE order_id=$1`, id)
@@ -931,7 +1033,7 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 		}
 	}
 
-	// kembalikan stok kemasan untuk bungkus
+	// kembalikan stok kemasan untuk bungkus (legacy)
 	if orderType == "take_away" {
 		totalQty := 0
 		for _, sr := range restores {
@@ -941,6 +1043,41 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 			if _, err := tx.Exec(ctx,
 				`UPDATE settings SET value=(COALESCE((SELECT value::int FROM settings WHERE key='packaging_stock'),0) + $2)::text WHERE key='packaging_stock'`,
 				totalQty); err != nil {
+				return model.Order{}, err
+			}
+		}
+	}
+
+	// Kembalikan multi-kemasan
+	pkgRestores := make(map[string]int)
+	for _, sr := range restores {
+		var pkgID, pkgRule string
+		err := tx.QueryRow(ctx, `SELECT COALESCE(packaging_id, ''), COALESCE(packaging_rule, 'take_away_only') FROM products WHERE id=$1`, sr.pid).Scan(&pkgID, &pkgRule)
+		if err == nil && pkgID != "" {
+			needs := false
+			if pkgRule == "always" {
+				needs = true
+			} else if orderType == "take_away" && pkgRule == "take_away_only" {
+				needs = true
+			}
+			if needs {
+				pkgRestores[pkgID] += sr.qty
+			}
+		}
+	}
+
+	for pID, qty := range pkgRestores {
+		var curStock int
+		err := tx.QueryRow(ctx, `SELECT stock FROM packagings WHERE id=$1 FOR UPDATE`, pID).Scan(&curStock)
+		if err == nil {
+			newStock := curStock + qty
+			if _, err := tx.Exec(ctx, `UPDATE packagings SET stock=$2 WHERE id=$1`, pID, newStock); err != nil {
+				return model.Order{}, err
+			}
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO packaging_logs (packaging_id, order_id, order_number, change_amount, balance_after, reason, created_at)
+				 VALUES ($1, $2, $3, $4, $5, 'void_restored', now())`,
+				pID, id, orderNumber, qty, newStock); err != nil {
 				return model.Order{}, err
 			}
 		}
@@ -1249,6 +1386,164 @@ func (s *SQLStore) SetPackagingStock(n int) error {
 		 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
 		fmt.Sprintf("%d", n))
 	return err
+}
+
+func (s *SQLStore) Packagings() ([]model.Packaging, error) {
+	ctx := context.Background()
+	rows, err := s.pool.Query(ctx, `SELECT id, name, stock, created_at FROM packagings ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []model.Packaging{}
+	for rows.Next() {
+		var p model.Packaging
+		if err := rows.Scan(&p.ID, &p.Name, &p.Stock, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLStore) CreatePackaging(p model.Packaging) (model.Packaging, error) {
+	ctx := context.Background()
+	if p.ID == "" {
+		p.ID = fmt.Sprintf("pkg-%d", time.Now().UnixNano())
+	}
+	p.CreatedAt = time.Now()
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO packagings (id, name, stock, created_at) VALUES ($1, $2, $3, $4)`,
+		p.ID, p.Name, p.Stock, p.CreatedAt)
+	if err != nil {
+		return model.Packaging{}, err
+	}
+	if p.Stock > 0 {
+		_, _ = s.pool.Exec(ctx,
+			`INSERT INTO packaging_logs (packaging_id, change_amount, balance_after, reason, created_at)
+			 VALUES ($1, $2, $3, 'Stok Awal', $4)`,
+			p.ID, p.Stock, p.Stock, p.CreatedAt)
+	}
+	return p, nil
+}
+
+func (s *SQLStore) UpdatePackaging(p model.Packaging) (model.Packaging, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return model.Packaging{}, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	var curStock int
+	err = tx.QueryRow(ctx, `SELECT stock FROM packagings WHERE id=$1 FOR UPDATE`, p.ID).Scan(&curStock)
+	if err == pgx.ErrNoRows {
+		return model.Packaging{}, ErrPackagingNotFound
+	} else if err != nil {
+		return model.Packaging{}, err
+	}
+
+	diff := p.Stock - curStock
+	tag, err := tx.Exec(ctx, `UPDATE packagings SET name=$2, stock=$3 WHERE id=$1`, p.ID, p.Name, p.Stock)
+	if err != nil {
+		return model.Packaging{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return model.Packaging{}, ErrPackagingNotFound
+	}
+
+	if diff != 0 {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO packaging_logs (packaging_id, change_amount, balance_after, reason, created_at)
+			 VALUES ($1, $2, $3, 'Penyesuaian manual', now())`,
+			p.ID, diff, p.Stock)
+		if err != nil {
+			return model.Packaging{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return model.Packaging{}, err
+	}
+
+	var res model.Packaging
+	err = s.pool.QueryRow(ctx, `SELECT id, name, stock, created_at FROM packagings WHERE id=$1`, p.ID).
+		Scan(&res.ID, &res.Name, &res.Stock, &res.CreatedAt)
+	return res, err
+}
+
+func (s *SQLStore) DeletePackaging(id string) error {
+	ctx := context.Background()
+	tag, err := s.pool.Exec(ctx, `DELETE FROM packagings WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrPackagingNotFound
+	}
+	return nil
+}
+
+func (s *SQLStore) AdjustPackaging(id string, change int, reason, orderID, orderNumber string) error {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	var curStock int
+	err = tx.QueryRow(ctx, `SELECT stock FROM packagings WHERE id=$1 FOR UPDATE`, id).Scan(&curStock)
+	if err == pgx.ErrNoRows {
+		return ErrPackagingNotFound
+	} else if err != nil {
+		return err
+	}
+
+	newStock := curStock + change
+	_, err = tx.Exec(ctx, `UPDATE packagings SET stock=$2 WHERE id=$1`, id, newStock)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO packaging_logs (packaging_id, order_id, order_number, change_amount, balance_after, reason, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, now())`,
+		id, orderID, orderNumber, change, newStock, reason)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (s *SQLStore) PackagingLogs(limit int) ([]model.PackagingLog, error) {
+	ctx := context.Background()
+	if limit <= 0 {
+		limit = 100
+	}
+	query := `
+		SELECT l.id, l.packaging_id, COALESCE(p.name, l.packaging_id), l.order_id, l.order_number, l.change_amount, l.balance_after, l.reason, l.created_at
+		FROM packaging_logs l
+		LEFT JOIN packagings p ON p.id = l.packaging_id
+		ORDER BY l.id DESC
+		LIMIT $1`
+	rows, err := s.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []model.PackagingLog{}
+	for rows.Next() {
+		var l model.PackagingLog
+		if err := rows.Scan(&l.ID, &l.PackagingID, &l.PackagingName, &l.OrderID, &l.OrderNumber, &l.ChangeAmount, &l.BalanceAfter, &l.Reason, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
 }
 
 func (s *SQLStore) Ping() error {

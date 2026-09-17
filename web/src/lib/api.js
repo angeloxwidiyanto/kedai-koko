@@ -212,7 +212,7 @@ export function deleteUser(id) {
   return fetch('/api/admin/users/' + id, { method: 'DELETE', headers: headers() }).then(json)
 }
 
-// --- Stok kemasan ---
+// --- Stok kemasan (legacy & multi-kemasan) ---
 export function getPackagingStock() {
   return fetch('/api/settings/packaging', { headers: headers() }).then(json)
 }
@@ -221,6 +221,38 @@ export function setPackagingStock(stock) {
   return fetch('/api/settings/packaging', {
     method: 'PATCH', headers: headers(), body: JSON.stringify({ stock }),
   }).then(json)
+}
+
+export function getPackagings() {
+  return fetch('/api/packagings', { headers: headers() }).then(json)
+}
+
+export function createPackaging(data) {
+  return fetch('/api/admin/packagings', {
+    method: 'POST', headers: headers(), body: JSON.stringify(data),
+  }).then(json)
+}
+
+export function updatePackaging(id, data) {
+  return fetch(`/api/admin/packagings/${id}`, {
+    method: 'PUT', headers: headers(), body: JSON.stringify(data),
+  }).then(json)
+}
+
+export function deletePackaging(id) {
+  return fetch(`/api/admin/packagings/${id}`, {
+    method: 'DELETE', headers: headers(),
+  }).then(json)
+}
+
+export function adjustPackaging(id, change, reason) {
+  return fetch(`/api/admin/packagings/${id}/adjust`, {
+    method: 'POST', headers: headers(), body: JSON.stringify({ change, reason }),
+  }).then(json)
+}
+
+export function getPackagingLogs(limit = 100) {
+  return fetch(`/api/admin/packagings/logs?limit=${limit}`, { headers: headers() }).then(json)
 }
 
 // --- Upload gambar (admin) ---

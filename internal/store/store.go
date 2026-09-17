@@ -31,6 +31,7 @@ var (
 	ErrTableNoRequired   = errors.New("nomor meja wajib diisi untuk makan di tempat")
 	ErrOutOfPackaging    = errors.New("stok kemasan tidak cukup untuk pesanan bungkus")
 	ErrInvalidPackaging  = errors.New("jumlah stok kemasan tidak valid")
+	ErrPackagingNotFound = errors.New("kemasan tidak ditemukan")
 	ErrPaymentMethod     = errors.New("metode pembayaran wajib dipilih")
 )
 
@@ -71,6 +72,12 @@ type Store interface {
 	// Stok kemasan
 	GetPackagingStock() (int, error)
 	SetPackagingStock(n int) error
+	Packagings() ([]model.Packaging, error)
+	CreatePackaging(p model.Packaging) (model.Packaging, error)
+	UpdatePackaging(p model.Packaging) (model.Packaging, error)
+	DeletePackaging(id string) error
+	AdjustPackaging(id string, change int, reason, orderID, orderNumber string) error
+	PackagingLogs(limit int) ([]model.PackagingLog, error)
 
 	// Kesehatan koneksi (untuk keep-alive Supabase)
 	Ping() error

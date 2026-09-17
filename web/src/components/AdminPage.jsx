@@ -3,16 +3,21 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { rupiah } from '../lib/format'
 import ImageCropper from './ImageCropper'
 import {
+  adjustPackaging,
   archiveProduct,
   createCategory,
+  createPackaging,
   createProduct,
   createUser,
   deleteCategory,
+  deletePackaging,
   deleteUser,
   downloadReportCSV,
   getAdminProducts,
   getAdminUsers,
   getCategories,
+  getPackagingLogs,
+  getPackagings,
   getPackagingStock,
   getReportSummary,
   restoreProduct,
@@ -20,6 +25,7 @@ import {
   setPackagingStock,
   setStock,
   updateCategory,
+  updatePackaging,
   updateProduct,
   updateUser,
   uploadImage,
@@ -287,6 +293,103 @@ function ReportsView() {
           </div>
         </>
       )}
+
+      <div className="admin-panel" style={{ marginTop: 24 }}>
+        <PackagingLogsSection />
+      </div>
+    </div>
+  )
+}
+
+function PackagingLogsSection() {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState(null)
+
+  function loadLogs() {
+    setLoading(true)
+    setErr(null)
+    getPackagingLogs(100)
+      .then(setLogs)
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadLogs()
+  }, [])
+
+  return (
+    <div className="packaging-logs-section">
+      <div className="manage-head" style={{ marginBottom: 16 }}>
+        <div>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="material-symbols-outlined">receipt_long</span>
+            Log Pemakaian & Penyesuaian Kemasan
+          </h3>
+          <p className="section-subhead">Riwayat pengurangan saat transaksi atau penambahan stok kemasan.</p>
+        </div>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={loadLogs}>
+          <span className="material-symbols-outlined">refresh</span>
+          Refresh
+        </button>
+      </div>
+
+      {err && <div className="state-box state-box-small"><p>{err}</p></div>}
+      {loading ? (
+        <div className="sk-line w80" style={{ height: 100 }} />
+      ) : logs.length === 0 ? (
+        <p className="muted">Belum ada riwayat aktivitas kemasan.</p>
+      ) : (
+        <div className="log-table-container">
+          <table className="log-table">
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Kemasan</th>
+                <th>Perubahan</th>
+                <th>Sisa Stok</th>
+                <th>Keterangan / Pesanan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => {
+                const isDeduct = log.changeAmount < 0
+                return (
+                  <tr key={log.id}>
+                    <td className="log-time">
+                      {new Date(log.createdAt).toLocaleString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="log-pkg-name">
+                      <strong>{log.packagingName || log.packagingId}</strong>
+                    </td>
+                    <td className="log-change">
+                      <span className={`log-badge ${isDeduct ? 'deduct' : 'add'}`}>
+                        {log.changeAmount > 0 ? `+${log.changeAmount}` : log.changeAmount}
+                      </span>
+                    </td>
+                    <td className="log-balance">{log.balanceAfter} pcs</td>
+                    <td className="log-reason">
+                      {log.orderNumber ? (
+                        <span>
+                          Order <strong>{log.orderNumber}</strong> ({log.reason})
+                        </span>
+                      ) : (
+                        <span>{log.reason}</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -316,11 +419,14 @@ const EMPTY_PRODUCT = {
   tags: [],
   imageUrl: '',
   stock: -1,
+  packagingId: '',
+  packagingRule: 'take_away_only',
 }
 
 function MenuManageView({ onToast }) {
   const [products, setProducts] = useState(null)
   const [categories, setCategories] = useState([])
+  const [packagings, setPackagings] = useState([])
   const [err, setErr] = useState(null)
   const [editing, setEditing] = useState(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -329,10 +435,11 @@ function MenuManageView({ onToast }) {
 
   function load() {
     setErr(null)
-    Promise.all([getAdminProducts(), getCategories()])
-      .then(([p, c]) => {
+    Promise.all([getAdminProducts(), getCategories(), getPackagings()])
+      .then(([p, c, pk]) => {
         setProducts(p)
         setCategories(c)
+        setPackagings(pk)
       })
       .catch((e) => setErr(e.message))
   }
@@ -422,7 +529,7 @@ function MenuManageView({ onToast }) {
 
   return (
     <div className="menu-manage">
-      <PackagingPanel onToast={onToast} />
+      <PackagingPanel packagings={packagings} onRefresh={load} onToast={onToast} />
       <div className="manage-section">
         <div className="manage-head">
           <h3>Kategori</h3>
@@ -460,33 +567,43 @@ function MenuManageView({ onToast }) {
           <div className="sk-line w80" style={{ height: 120, marginTop: 16 }} />
         ) : (
           <div className="product-table">
-            {active.map((p) => (
-              <div className="product-row" key={p.id}>
-                <div className="pr-thumb" style={{ background: p.color }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt="" /> : p.emoji}
+            {active.map((p) => {
+              const pkg = packagings.find((pk) => pk.id === p.packagingId)
+              return (
+                <div className="product-row" key={p.id}>
+                  <div className="pr-thumb" style={{ background: p.color }}>
+                    {p.imageUrl ? <img src={p.imageUrl} alt="" /> : p.emoji}
+                  </div>
+                  <div className="pr-info">
+                    <span className="pr-name">{p.name}</span>
+                    <span className="pr-meta">
+                      {rupiah(p.price)} · {p.category}{p.stock >= 0 ? ` · stok ${p.stock}` : ''}
+                      {pkg ? (
+                        <span className="pr-pkg-tag" title={`Kemasan: ${pkg.name} (${p.packagingRule === 'always' ? 'Dine In & Bungkus' : 'Bungkus Saja'})`}>
+                          📦 {pkg.name}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                  <StockInput product={p} onChanged={load} onError={setErr} />
+                  <button
+                    type="button"
+                    className={`switch ${p.available ? 'on' : 'off'}`}
+                    onClick={() => toggleAvailability(p)}
+                    aria-label={p.available ? 'Tandai habis' : 'Tandai tersedia'}
+                  >
+                    <span className="switch-dot" />
+                    <span className="switch-label">{p.available ? 'Sedia' : 'Habis'}</span>
+                  </button>
+                  <button type="button" className="mini-action" onClick={() => setEditing(p)} aria-label="Ubah produk">
+                    <span className="material-symbols-outlined">edit</span>
+                  </button>
+                  <button type="button" className="mini-action danger" onClick={() => doArchive(p)} aria-label="Arsipkan produk">
+                    <span className="material-symbols-outlined">archive</span>
+                  </button>
                 </div>
-                <div className="pr-info">
-                  <span className="pr-name">{p.name}</span>
-                  <span className="pr-meta">{rupiah(p.price)} · {p.category}{p.stock >= 0 ? ` · stok ${p.stock}` : ''}</span>
-                </div>
-                <StockInput product={p} onChanged={load} onError={setErr} />
-                <button
-                  type="button"
-                  className={`switch ${p.available ? 'on' : 'off'}`}
-                  onClick={() => toggleAvailability(p)}
-                  aria-label={p.available ? 'Tandai habis' : 'Tandai tersedia'}
-                >
-                  <span className="switch-dot" />
-                  <span className="switch-label">{p.available ? 'Sedia' : 'Habis'}</span>
-                </button>
-                <button type="button" className="mini-action" onClick={() => setEditing(p)} aria-label="Ubah produk">
-                  <span className="material-symbols-outlined">edit</span>
-                </button>
-                <button type="button" className="mini-action danger" onClick={() => doArchive(p)} aria-label="Arsipkan produk">
-                  <span className="material-symbols-outlined">archive</span>
-                </button>
-              </div>
-            ))}
+              )
+            })}
 
             <button
               type="button"
@@ -523,6 +640,7 @@ function MenuManageView({ onToast }) {
             key={editing.id || 'new'}
             product={editing}
             categories={categories}
+            packagings={packagings}
             onClose={() => setEditing(null)}
             onSave={saveProduct}
           />
@@ -543,9 +661,11 @@ function MenuManageView({ onToast }) {
   )
 }
 
-function ProductForm({ product, categories, onClose, onSave }) {
+function ProductForm({ product, categories, packagings = [], onClose, onSave }) {
   const [form, setForm] = useState({
     ...product,
+    packagingId: product.packagingId || '',
+    packagingRule: product.packagingRule || 'take_away_only',
     tags: (product.tags || []).join(', '),
   })
   const [saving, setSaving] = useState(false)
@@ -634,6 +754,35 @@ function ProductForm({ product, categories, onClose, onSave }) {
               placeholder="-1"
             />
           </label>
+
+          <div className="field-row">
+            <label className="field">
+              Wadah Kemasan
+              <select
+                value={form.packagingId || ''}
+                onChange={(e) => set('packagingId', e.target.value)}
+              >
+                <option value="">Tanpa Kemasan</option>
+                {packagings.map((pkg) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.name} (sisa {pkg.stock})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Aturan Penggunaan
+              <select
+                value={form.packagingRule || 'take_away_only'}
+                onChange={(e) => set('packagingRule', e.target.value)}
+                disabled={!form.packagingId}
+              >
+                <option value="take_away_only">Hanya Saat Bungkus</option>
+                <option value="always">Selalu (Dine In & Bungkus)</option>
+              </select>
+            </label>
+          </div>
+
           <label className="field">
             Deskripsi
             <input value={form.description} onChange={(e) => set('description', e.target.value)} />
@@ -744,50 +893,281 @@ function CategoryForm({ initial, onClose, onSave }) {
   )
 }
 
-function PackagingPanel({ onToast }) {
-  const [stock, setStock] = useState(null)
-  const [val, setVal] = useState('')
+function PackagingPanel({ packagings = [], onRefresh, onToast }) {
+  const [adjustItem, setAdjustItem] = useState(null)
+  const [adjustChange, setAdjustChange] = useState('')
+  const [adjustReason, setAdjustReason] = useState('Restok kemasan')
+  const [adjusting, setAdjusting] = useState(false)
 
-  function load() {
-    getPackagingStock()
-      .then((d) => { setStock(d.stock); setVal(String(d.stock)) })
-      .catch(() => setStock(null))
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newStock, setNewStock] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  async function handleAdjust(e) {
+    e.preventDefault()
+    const chg = parseInt(adjustChange, 10)
+    if (Number.isNaN(chg) || chg === 0) return
+    setAdjusting(true)
+    try {
+      await adjustPackaging(adjustItem.id, chg, adjustReason || 'Penyesuaian manual')
+      onToast(`Stok ${adjustItem.name} berhasil diperbarui`)
+      setAdjustItem(null)
+      setAdjustChange('')
+      setAdjustReason('Restok kemasan')
+      onRefresh()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setAdjusting(false)
+    }
   }
 
-  useEffect(() => { load() }, [])
-
-  async function apply() {
-    const n = parseInt(val, 10)
-    if (Number.isNaN(n) || n < 0) return
+  async function handleCreate(e) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    const stk = Math.max(0, parseInt(newStock, 10) || 0)
+    setCreating(true)
     try {
-      const d = await setPackagingStock(n)
-      setStock(d.stock)
-      onToast(`Stok kemasan diisi ulang ke ${d.stock}`)
-    } catch (e) {
-      /* ignore */
+      await createPackaging({ name: newName.trim(), stock: stk })
+      onToast(`Wadah kemasan "${newName}" ditambahkan`)
+      setShowCreate(false)
+      setNewName('')
+      setNewStock('')
+      onRefresh()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setCreating(false)
     }
   }
 
   return (
     <div className="manage-section packaging-panel">
       <div className="manage-head">
-        <h3>Stok Kemasan (Bungkus)</h3>
-        {stock !== null && <span className={`pack-badge ${stock <= 10 ? 'low' : ''}`}>{stock} tersisa</span>}
-      </div>
-      <div className="packaging-row">
-        <input
-          className="stock-input"
-          type="number"
-          min="0"
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') apply() }}
-          aria-label="Stok kemasan"
-        />
-        <button type="button" className="btn btn-primary btn-sm" onClick={apply}>
-          Simpan
+        <div>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="material-symbols-outlined">inventory_2</span>
+            Stok Wadah & Kemasan
+          </h3>
+          <p className="section-subhead">Kelola stok wadah kemasan untuk dine in dan bungkus.</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => setShowCreate(true)}
+        >
+          <span className="material-symbols-outlined">add</span>
+          Wadah Baru
         </button>
       </div>
+
+      <div className="packaging-cards-grid">
+        {packagings.map((pkg) => (
+          <div className="packaging-card" key={pkg.id}>
+            <div className="pkg-card-top">
+              <span className="pkg-card-title">{pkg.name}</span>
+              <span className={`pack-badge ${pkg.stock <= 15 ? 'low' : ''}`}>
+                {pkg.stock} pcs
+              </span>
+            </div>
+            <div className="pkg-card-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setAdjustItem(pkg)
+                  setAdjustChange('')
+                  setAdjustReason('Restok kemasan')
+                }}
+              >
+                <span className="material-symbols-outlined">tune</span>
+                Atur Stok
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal Adjust Stok */}
+      <AnimatePresence>
+        {adjustItem && (
+          <motion.div
+            className="modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.form
+              className="modal form-modal form-modal-sm"
+              onSubmit={handleAdjust}
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+            >
+              <div className="modal-head">
+                <h2>Atur Stok: {adjustItem.name}</h2>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => setAdjustItem(null)}
+                  aria-label="Tutup"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="form-body">
+                <p className="text-muted" style={{ margin: 0, fontSize: 14 }}>
+                  Stok saat ini: <strong>{adjustItem.stock} pcs</strong>
+                </p>
+
+                <label className="field">
+                  Perubahan Jumlah (+ untuk tambah, - untuk rusak/kurang)
+                  <input
+                    type="number"
+                    value={adjustChange}
+                    onChange={(e) => setAdjustChange(e.target.value)}
+                    placeholder="Contoh: +50 atau -5"
+                    required
+                    autoFocus
+                  />
+                </label>
+
+                <div className="quick-adjust-chips">
+                  <button
+                    type="button"
+                    className="chip"
+                    onClick={() => setAdjustChange('+50')}
+                  >
+                    +50 Restok
+                  </button>
+                  <button
+                    type="button"
+                    className="chip"
+                    onClick={() => setAdjustChange('+100')}
+                  >
+                    +100 Restok
+                  </button>
+                  <button
+                    type="button"
+                    className="chip chip-danger"
+                    onClick={() => {
+                      setAdjustChange('-1')
+                      setAdjustReason('Rusak/cacat')
+                    }}
+                  >
+                    -1 Rusak
+                  </button>
+                </div>
+
+                <label className="field">
+                  Alasan / Keterangan
+                  <input
+                    type="text"
+                    value={adjustReason}
+                    onChange={(e) => setAdjustReason(e.target.value)}
+                    placeholder="Contoh: Restok supplier, Rusak/bocor"
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setAdjustItem(null)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={adjusting || !adjustChange}
+                >
+                  {adjusting ? 'Menyimpan...' : 'Simpan Penyesuaian'}
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Wadah Baru */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            className="modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.form
+              className="modal form-modal form-modal-sm"
+              onSubmit={handleCreate}
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+            >
+              <div className="modal-head">
+                <h2>Tambah Wadah Baru</h2>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => setShowCreate(false)}
+                  aria-label="Tutup"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="form-body">
+                <label className="field">
+                  Nama Kemasan / Wadah
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Misal: Paper Cup 12oz, Kotak Bento"
+                    required
+                    autoFocus
+                  />
+                </label>
+
+                <label className="field">
+                  Stok Awal (pcs)
+                  <input
+                    type="number"
+                    min="0"
+                    value={newStock}
+                    onChange={(e) => setNewStock(e.target.value)}
+                    placeholder="0"
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowCreate(false)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating || !newName.trim()}
+                >
+                  {creating ? 'Menyimpan...' : 'Tambah Wadah'}
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -73,6 +73,14 @@ func Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings/packaging", HandleGetPackaging)
 	mux.HandleFunc("PATCH /api/settings/packaging", HandleSetPackaging)
 
+	// Multi Kemasan
+	mux.HandleFunc("GET /api/packagings", HandleGetPackagings)
+	mux.HandleFunc("POST /api/admin/packagings", HandleCreatePackaging)
+	mux.HandleFunc("PUT /api/admin/packagings/{id}", HandleUpdatePackaging)
+	mux.HandleFunc("DELETE /api/admin/packagings/{id}", HandleDeletePackaging)
+	mux.HandleFunc("POST /api/admin/packagings/{id}/adjust", HandleAdjustPackaging)
+	mux.HandleFunc("GET /api/admin/packagings/logs", HandlePackagingLogs)
+
 	mux.HandleFunc("POST /api/products", HandleCreateProduct)
 	mux.HandleFunc("PUT /api/products/{id}", HandleUpdateProduct)
 	mux.HandleFunc("PATCH /api/products/{id}/availability", HandleSetAvailability)
