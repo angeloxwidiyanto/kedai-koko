@@ -1,5 +1,0 @@
-./memory.go
-./pin.go
-./seed.go
-./sql.go
-./store.go

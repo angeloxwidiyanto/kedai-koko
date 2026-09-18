@@ -1,5 +1,0 @@
-./admin.go
-./auth.go
-./httpapi.go
-./upload.go
-./users.go
