@@ -842,17 +842,20 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	totalQty := 0
 	for _, it := range req.Items {
 		pr, ok := products[it.ProductID]
-		if !ok || pr.archived {
-			return model.Order{}, ErrProductNotFound
+		if !ok {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
 		}
-		if !pr.available {
-			return model.Order{}, ErrProductUnavailable
+		if pr.archived && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, pr.name)
+		}
+		if !pr.available && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
 		}
 		if it.Qty <= 0 {
 			return model.Order{}, ErrInvalidQty
 		}
-		if pr.stock >= 0 && it.Qty > pr.stock {
-			return model.Order{}, ErrProductUnavailable
+		if pr.stock >= 0 && it.Qty > pr.stock && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
 		}
 		items = append(items, model.OrderItem{
 			ProductID: pr.id,
@@ -908,7 +911,7 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 			return model.Order{}, err
 		}
 		// Hanya tolak jika belum ada sistem multi-packaging sama sekali
-		if pkgCount == 0 && neededPackaging > stock {
+		if !req.BypassValidation && pkgCount == 0 && neededPackaging > stock {
 			return model.Order{}, ErrOutOfPackaging
 		}
 		newLegacyStock := stock - neededPackaging
@@ -1271,14 +1274,14 @@ func (s *SQLStore) loadItems(ctx context.Context, ids []string) (map[string][]mo
 func (s *SQLStore) Report(from, to time.Time) (model.Report, error) {
 	ctx := context.Background()
 	r := model.Report{
-		From:         from,
-		To:           to,
-		TopProducts:  []model.TopProduct{},
-		RevenueByDay: []model.DailyRevenue{},
-		ByCashier:    []model.CashierRevenue{},
-		ByCategory:   []model.CategoryRevenue{},
-		ByHour:       []model.HourlyRevenue{},
-		ByOrderType:  []model.OrderTypeRevenue{},
+		From:            from,
+		To:              to,
+		TopProducts:     []model.TopProduct{},
+		RevenueByDay:    []model.DailyRevenue{},
+		ByCashier:       []model.CashierRevenue{},
+		ByCategory:      []model.CategoryRevenue{},
+		ByHour:          []model.HourlyRevenue{},
+		ByOrderType:     []model.OrderTypeRevenue{},
 		ByPaymentMethod: []model.PaymentMethodRevenue{},
 	}
 

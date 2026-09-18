@@ -10,8 +10,8 @@ import (
 )
 
 type MemoryStore struct {
-	mu         sync.Mutex
-	products   []model.Product
+	mu            sync.Mutex
+	products      []model.Product
 	categories    []model.Category
 	packagings    []model.Packaging
 	packagingLogs []model.PackagingLog
@@ -24,12 +24,12 @@ type MemoryStore struct {
 
 func NewMemory() *MemoryStore {
 	s := &MemoryStore{
-		products:      append([]model.Product(nil), defaultProducts...),
-		categories:    append([]model.Category(nil), defaultCategories...),
-		packagings:    append([]model.Packaging(nil), defaultPackagings...),
-		orders:        sampleOrders(time.Now()),
-		packaging:     100,
-		packagingFee:  2000,
+		products:     append([]model.Product(nil), defaultProducts...),
+		categories:   append([]model.Category(nil), defaultCategories...),
+		packagings:   append([]model.Packaging(nil), defaultPackagings...),
+		orders:       sampleOrders(time.Now()),
+		packaging:    100,
+		packagingFee: 2000,
 	}
 	s.counter = len(s.orders)
 	s.seedAdmin()
@@ -445,20 +445,20 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	for _, it := range req.Items {
 		idx := s.indexOfProduct(it.ProductID)
 		if idx < 0 {
-			return model.Order{}, ErrProductNotFound
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
 		}
 		p := &s.products[idx]
-		if p.Archived {
-			return model.Order{}, ErrProductNotFound
+		if p.Archived && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, p.Name)
 		}
-		if !p.Available {
-			return model.Order{}, ErrProductUnavailable
+		if !p.Available && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
 		}
 		if it.Qty <= 0 {
 			return model.Order{}, ErrInvalidQty
 		}
-		if p.Stock >= 0 && it.Qty > p.Stock {
-			return model.Order{}, ErrProductUnavailable
+		if p.Stock >= 0 && it.Qty > p.Stock && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
 		}
 		items = append(items, model.OrderItem{
 			ProductID: p.ID,
@@ -473,7 +473,7 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	}
 
 	// stok kemasan untuk take away (per satuan item)
-	if req.OrderType == "take_away" && totalQty > s.packaging {
+	if !req.BypassValidation && req.OrderType == "take_away" && totalQty > s.packaging {
 		return model.Order{}, ErrOutOfPackaging
 	}
 
@@ -749,14 +749,14 @@ func (s *MemoryStore) Report(from, to time.Time) (model.Report, error) {
 	defer s.mu.Unlock()
 
 	r := model.Report{
-		From:         from,
-		To:           to,
-		TopProducts:  []model.TopProduct{},
-		RevenueByDay: []model.DailyRevenue{},
-		ByCashier:    []model.CashierRevenue{},
-		ByCategory:   []model.CategoryRevenue{},
-		ByHour:       []model.HourlyRevenue{},
-		ByOrderType:  []model.OrderTypeRevenue{},
+		From:            from,
+		To:              to,
+		TopProducts:     []model.TopProduct{},
+		RevenueByDay:    []model.DailyRevenue{},
+		ByCashier:       []model.CashierRevenue{},
+		ByCategory:      []model.CategoryRevenue{},
+		ByHour:          []model.HourlyRevenue{},
+		ByOrderType:     []model.OrderTypeRevenue{},
 		ByPaymentMethod: []model.PaymentMethodRevenue{},
 	}
 

@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"kedaikoko/internal/model"
@@ -21,9 +22,9 @@ func TestOrderTypeRequired(t *testing.T) {
 func TestTableNoRequiredForDineIn(t *testing.T) {
 	s := newTestStore()
 	_, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 1, "")},
-		Paid:      30000,
-		OrderType: "dine_in",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 1, "")},
+		Paid:          30000,
+		OrderType:     "dine_in",
 		PaymentMethod: "tunai",
 	}, testAdmin())
 	if !errors.Is(err, ErrTableNoRequired) {
@@ -32,11 +33,11 @@ func TestTableNoRequiredForDineIn(t *testing.T) {
 
 	// dine in dengan meja sukses
 	o, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 1, "")},
-		Paid:      30000,
-		OrderType: "dine_in",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 1, "")},
+		Paid:          30000,
+		OrderType:     "dine_in",
 		PaymentMethod: "tunai",
-		TableNo:   "5",
+		TableNo:       "5",
 	}, testAdmin())
 	if err != nil {
 		t.Fatalf("dine in with table: %v", err)
@@ -52,9 +53,9 @@ func TestPackagingConsumedPerItem(t *testing.T) {
 
 	// bungkus 3 item -> sisa 2
 	o, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("tea-1", 1, "")},
-		Paid:      100000,
-		OrderType: "take_away",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 2, ""), itemReq("tea-1", 1, "")},
+		Paid:          100000,
+		OrderType:     "take_away",
 		PaymentMethod: "tunai",
 	}, testAdmin())
 	if err != nil {
@@ -69,11 +70,11 @@ func TestPackagingConsumedPerItem(t *testing.T) {
 
 	// dine in tidak memakan kemasan
 	if _, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 1, "")},
-		Paid:      30000,
-		OrderType: "dine_in",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 1, "")},
+		Paid:          30000,
+		OrderType:     "dine_in",
 		PaymentMethod: "tunai",
-		TableNo:   "3",
+		TableNo:       "3",
 	}, testAdmin()); err != nil {
 		t.Fatalf("dine in: %v", err)
 	}
@@ -87,9 +88,9 @@ func TestPackagingBlocksWhenInsufficient(t *testing.T) {
 	s.packaging = 1
 
 	_, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 2, "")},
-		Paid:      60000,
-		OrderType: "take_away",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 2, "")},
+		Paid:          60000,
+		OrderType:     "take_away",
 		PaymentMethod: "tunai",
 	}, testAdmin())
 	if !errors.Is(err, ErrOutOfPackaging) {
@@ -105,9 +106,9 @@ func TestVoidRestoresPackaging(t *testing.T) {
 	s.packaging = 10
 
 	o, err := s.CreateOrder(model.CreateOrderRequest{
-		Items:     []model.OrderItemInput{itemReq("rice-1", 2, "")},
-		Paid:      60000,
-		OrderType: "take_away",
+		Items:         []model.OrderItemInput{itemReq("rice-1", 2, "")},
+		Paid:          60000,
+		OrderType:     "take_away",
 		PaymentMethod: "tunai",
 	}, testAdmin())
 	if err != nil {
@@ -195,5 +196,56 @@ func TestFreePackagingOnlyOrder(t *testing.T) {
 	}
 	if s.packaging != 8 {
 		t.Fatalf("expected packaging stock to be 8, got %d", s.packaging)
+	}
+}
+
+func TestBypassValidation(t *testing.T) {
+	s := newTestStore()
+
+	if _, err := s.SetProductAvailability("rice-1", false); err != nil {
+		t.Fatal(err)
+	}
+
+	// tanpa bypass -> gagal, dan pesan menyebut nama produk
+	_, err := s.CreateOrder(model.CreateOrderRequest{
+		Items:         []model.OrderItemInput{itemReq("rice-1", 1, "")},
+		Paid:          30000,
+		PaymentMethod: "tunai",
+		OrderType:     "take_away",
+	}, testAdmin())
+	if !errors.Is(err, ErrProductUnavailable) {
+		t.Fatalf("expected ErrProductUnavailable, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "Nasi Uduk") {
+		t.Fatalf("error should contain product name, got %q", err.Error())
+	}
+
+	// dengan bypass -> sukses
+	o, err := s.CreateOrder(model.CreateOrderRequest{
+		Items:            []model.OrderItemInput{itemReq("rice-1", 1, "")},
+		Paid:             30000,
+		PaymentMethod:    "tunai",
+		OrderType:        "take_away",
+		BypassValidation: true,
+	}, testAdmin())
+	if err != nil {
+		t.Fatalf("bypass order should succeed: %v", err)
+	}
+	if o.Status != "paid" {
+		t.Fatalf("bypass order should be paid, got %s", o.Status)
+	}
+
+	// produk terarsip + bypass -> sukses
+	if err := s.ArchiveProduct("rice-2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateOrder(model.CreateOrderRequest{
+		Items:            []model.OrderItemInput{itemReq("rice-2", 1, "")},
+		Paid:             55000,
+		PaymentMethod:    "tunai",
+		OrderType:        "take_away",
+		BypassValidation: true,
+	}, testAdmin()); err != nil {
+		t.Fatalf("archived bypass order should succeed: %v", err)
 	}
 }

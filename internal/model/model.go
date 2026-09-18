@@ -10,16 +10,16 @@ type Category struct {
 }
 
 type Product struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Price       int      `json:"price"`
-	Description string   `json:"description"`
-	Emoji       string   `json:"emoji"`
-	Color       string   `json:"color"`
-	Tags        []string `json:"tags,omitempty"`
-	Available   bool     `json:"available"`
-	Archived    bool     `json:"archived"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Category      string   `json:"category"`
+	Price         int      `json:"price"`
+	Description   string   `json:"description"`
+	Emoji         string   `json:"emoji"`
+	Color         string   `json:"color"`
+	Tags          []string `json:"tags,omitempty"`
+	Available     bool     `json:"available"`
+	Archived      bool     `json:"archived"`
 	ImageURL      string   `json:"imageUrl,omitempty"`
 	Stock         int      `json:"stock"`
 	PackagingID   string   `json:"packagingId,omitempty"`
@@ -65,12 +65,12 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID                string      `json:"id"`
-	Number            string      `json:"number"`
-	OrderType         string      `json:"orderType"`
-	TableNo           string      `json:"tableNo,omitempty"`
-	Items             []OrderItem `json:"items"`
-	Subtotal          int         `json:"subtotal"`
+	ID                string                `json:"id"`
+	Number            string                `json:"number"`
+	OrderType         string                `json:"orderType"`
+	TableNo           string                `json:"tableNo,omitempty"`
+	Items             []OrderItem           `json:"items"`
+	Subtotal          int                   `json:"subtotal"`
 	PackagingFeeTotal int                   `json:"packagingFeeTotal,omitempty"`
 	PackagingQty      int                   `json:"packagingQty,omitempty"`
 	ExtraPackagings   []OrderPackagingInput `json:"extraPackagings,omitempty"`
@@ -115,6 +115,7 @@ type CreateOrderRequest struct {
 	PackagingQty      int                   `json:"packagingQty,omitempty"`
 	ExtraPackagings   []OrderPackagingInput `json:"extraPackagings,omitempty"`
 	ClientOrderID     string                `json:"clientOrderId,omitempty"`
+	BypassValidation  bool                  `json:"bypassValidation,omitempty"`
 	CreatedAt         *time.Time            `json:"createdAt,omitempty"`
 }
 
@@ -164,19 +165,19 @@ type PaymentMethodRevenue struct {
 }
 
 type Report struct {
-	From             time.Time            `json:"from"`
-	To               time.Time            `json:"to"`
-	TotalRevenue     int                  `json:"totalRevenue"`
-	TotalDiscount    int                  `json:"totalDiscount"`
-	OrderCount       int                  `json:"orderCount"`
-	VoidCount        int                  `json:"voidCount"`
-	AvgOrder         int                  `json:"avgOrder"`
-	ItemsSold        int                  `json:"itemsSold"`
-	TopProducts      []TopProduct         `json:"topProducts"`
-	RevenueByDay     []DailyRevenue       `json:"revenueByDay"`
-	ByCashier        []CashierRevenue     `json:"byCashier"`
-	ByCategory       []CategoryRevenue    `json:"byCategory"`
-	ByHour           []HourlyRevenue      `json:"byHour"`
-	ByOrderType      []OrderTypeRevenue   `json:"byOrderType"`
-	ByPaymentMethod  []PaymentMethodRevenue `json:"byPaymentMethod"`
+	From            time.Time              `json:"from"`
+	To              time.Time              `json:"to"`
+	TotalRevenue    int                    `json:"totalRevenue"`
+	TotalDiscount   int                    `json:"totalDiscount"`
+	OrderCount      int                    `json:"orderCount"`
+	VoidCount       int                    `json:"voidCount"`
+	AvgOrder        int                    `json:"avgOrder"`
+	ItemsSold       int                    `json:"itemsSold"`
+	TopProducts     []TopProduct           `json:"topProducts"`
+	RevenueByDay    []DailyRevenue         `json:"revenueByDay"`
+	ByCashier       []CashierRevenue       `json:"byCashier"`
+	ByCategory      []CategoryRevenue      `json:"byCategory"`
+	ByHour          []HourlyRevenue        `json:"byHour"`
+	ByOrderType     []OrderTypeRevenue     `json:"byOrderType"`
+	ByPaymentMethod []PaymentMethodRevenue `json:"byPaymentMethod"`
 }

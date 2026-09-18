@@ -126,7 +126,7 @@ export function syncOrderToServer(payload) {
   return fetch('/api/orders', {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, bypassValidation: true }),
   }).then(json)
 }
 

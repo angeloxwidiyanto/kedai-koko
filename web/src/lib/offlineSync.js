@@ -174,9 +174,33 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = [], c
 }
 
 /**
- * Mengambil seluruh pesanan yang belum tersinkronisasi.
+ * Mengambil seluruh pesanan yang masih ada di antrean (belum terkirim,
+ * gagal sementara, maupun gagal permanen) — untuk ditampilkan di riwayat.
  */
 export async function getPendingOrders() {
+  try {
+    const db = await openDB()
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PENDING, 'readonly')
+      const req = tx.objectStore(STORE_PENDING).getAll()
+      req.onsuccess = () => {
+        const list = (req.result || [])
+          .filter((item) => item.status === 'pending' || item.status === 'failed' || item.status === 'permanent')
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        resolve(list)
+      }
+      req.onerror = () => reject(req.error)
+    })
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Mengambil pesanan yang masih layak untuk dicoba sinkronisasi otomatis
+ * (status pending atau failed). Pesanan gagal permanen tidak diikutkan.
+ */
+export async function getRetryableOrders() {
   try {
     const db = await openDB()
     return await new Promise((resolve, reject) => {
@@ -196,11 +220,11 @@ export async function getPendingOrders() {
 }
 
 /**
- * Mengambil jumlah pesanan yang menunggu sinkronisasi.
+ * Mengambil jumlah pesanan yang masih bisa disinkronkan otomatis.
  */
 export async function getPendingCount() {
   try {
-    const list = await getPendingOrders()
+    const list = await getRetryableOrders()
     return list.length
   } catch {
     return 0
@@ -275,7 +299,7 @@ export async function getCachedCatalog() {
 /**
  * Update status error pada record pending order di IndexedDB.
  */
-export async function updatePendingOrderError(id, errorMsg) {
+export async function updatePendingOrderError(id, errorMsg, permanent = false) {
   try {
     const db = await openDB()
     await new Promise((resolve, reject) => {
@@ -285,7 +309,7 @@ export async function updatePendingOrderError(id, errorMsg) {
       req.onsuccess = () => {
         const data = req.result
         if (data) {
-          data.status = 'failed'
+          data.status = permanent ? 'permanent' : 'failed'
           data.lastError = errorMsg
           data.retryCount = (data.retryCount || 0) + 1
           if (data.order) {
@@ -313,6 +337,10 @@ export async function discardPendingOrder(id) {
 /**
  * Sinkronisasi satu pesanan offline tertentu ke backend.
  */
+function isPermanentError(err) {
+  return !!err && typeof err.status === 'number' && err.status >= 400 && err.status < 500
+}
+
 export async function syncSingleOrder(id, syncHandler) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error('Perangkat sedang offline. Sambungkan ke internet terlebih dahulu.')
@@ -335,7 +363,7 @@ export async function syncSingleOrder(id, syncHandler) {
     return res
   } catch (err) {
     const msg = err.message || 'Gagal sinkronisasi ke server'
-    await updatePendingOrderError(id, msg)
+    await updatePendingOrderError(id, msg, isPermanentError(err))
     throw err
   }
 }
@@ -358,7 +386,7 @@ export async function syncPendingOrders(syncHandler) {
   let failedCount = 0
 
   try {
-    const pendingList = await getPendingOrders()
+    const pendingList = await getRetryableOrders()
     for (const item of pendingList) {
       try {
         await syncHandler(item.payload)
@@ -368,10 +396,10 @@ export async function syncPendingOrders(syncHandler) {
         console.warn(`[offlineSync] gagal sinkron order ${item.id}:`, err)
         failedCount++
         const errMsg = err.message || 'Gagal tersambung ke server'
-        await updatePendingOrderError(item.id, errMsg)
+        await updatePendingOrderError(item.id, errMsg, isPermanentError(err))
 
         // Jika koneksi internet benar-benar terputus di tengah jalan, hentikan batch loop
-        if (!navigator.onLine || err.message?.includes('fetch') || err.status === 0) {
+        if (!navigator.onLine || !err.status || err.status === 0 || err.message?.includes('fetch')) {
           break
         }
       }
