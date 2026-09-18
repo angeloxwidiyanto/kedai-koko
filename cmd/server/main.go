@@ -39,7 +39,9 @@ func main() {
 
 	driver, err := store.Init()
 	if err != nil {
-		log.Fatalf("gagal inisialisasi penyimpanan: %v", err)
+		log.Printf("Peringatan: gagal inisialisasi penyimpanan database (%v). Menggunakan in-memory fallback agar server tetap melayani aplikasi.", err)
+		store.Default = store.NewMemory()
+		driver = "in-memory (fallback)"
 	}
 	log.Printf("Penyimpanan: %s", driver)
 

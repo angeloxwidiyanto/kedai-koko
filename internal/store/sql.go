@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,8 @@ func NewSQL(url string) (*SQLStore, error) {
 	// bernama yang di-cache. DescribeExec tetap melakukan Describe (agar tipe
 	// parameter bisa ditentukan) tanpa menyimpan statement.
 	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
+	cfg.MaxConns = 3
+	cfg.MaxConnIdleTime = 1 * time.Minute
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
@@ -39,8 +42,7 @@ func NewSQL(url string) (*SQLStore, error) {
 
 	s := &SQLStore{pool: pool}
 	if err := s.migrate(ctx); err != nil {
-		pool.Close()
-		return nil, err
+		log.Printf("[store] migrasi peringatan: %v (tetap berjalan)", err)
 	}
 	return s, nil
 }
