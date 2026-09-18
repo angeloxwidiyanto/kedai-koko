@@ -909,12 +909,24 @@ button {
 .packaging-picker-card {
   max-width: 480px;
   width: 90%;
+  background: var(--surface-lowest, #ffffff);
+  border: 3px solid var(--on-bg, #2a241e);
+  border-radius: var(--r-xl, 24px);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.packaging-picker-body {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .packaging-picker-grid {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 14px;
   max-height: 55vh;
   overflow-y: auto;
 }

@@ -28,70 +28,73 @@ export default function PackagingPickerModal({ packagings = [], isDineIn = true,
       onClick={onClose}
     >
       <motion.div
-        className="modal-card packaging-picker-card"
-        initial={{ scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
+        className="modal packaging-picker-card"
+        style={{ background: '#ffffff', backgroundColor: '#ffffff' }}
+        initial={{ y: 30, scale: 0.95, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        exit={{ y: 20, scale: 0.95, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 350 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
+        <div className="modal-head">
           <div>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, fontSize: '18px' }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>
                 inventory_2
               </span>
               Pilih Jenis Kemasan
-            </h3>
+            </h2>
             <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
               {isDineIn
                 ? 'Wadah gratis untuk bungkus sisa makanan tamu'
                 : `Dikenakan biaya Rp${fee.toLocaleString('id-ID')} per wadah`}
             </p>
           </div>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Tutup">
+          <button type="button" className="close-btn" onClick={onClose} aria-label="Tutup">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        <div className="packaging-picker-grid">
-          {list.map((pkg) => {
-            const emoji = getPackagingEmoji(pkg.name)
+        <div className="packaging-picker-body">
+          <div className="packaging-picker-grid">
+            {list.map((pkg) => {
+              const emoji = getPackagingEmoji(pkg.name)
 
-            return (
-              <button
-                key={pkg.id}
-                type="button"
-                className="pkg-pick-item"
-                onClick={() => {
-                  onSelect(pkg)
-                  onClose()
-                }}
-              >
-                <div className="pkg-pick-emoji" aria-hidden="true">
-                  {emoji}
-                </div>
-                <div className="pkg-pick-info">
-                  <span className="pkg-pick-name">{pkg.name}</span>
-                  <div className="pkg-pick-meta">
-                    <span className={`pkg-stock-badge ${pkg.stock <= 10 ? 'low' : ''}`}>
-                      Stok: {pkg.stock} pcs
-                    </span>
-                    <span className={`pkg-price-badge ${isDineIn ? 'free' : ''}`}>
-                      {isDineIn ? 'GRATIS' : `+Rp${fee.toLocaleString('id-ID')}`}
-                    </span>
+              return (
+                <button
+                  key={pkg.id}
+                  type="button"
+                  className="pkg-pick-item"
+                  onClick={() => {
+                    onSelect(pkg)
+                    onClose()
+                  }}
+                >
+                  <div className="pkg-pick-emoji" aria-hidden="true">
+                    {emoji}
                   </div>
-                </div>
-                <span className="material-symbols-outlined pkg-pick-arrow">add_circle</span>
-              </button>
-            )
-          })}
-        </div>
+                  <div className="pkg-pick-info">
+                    <span className="pkg-pick-name">{pkg.name}</span>
+                    <div className="pkg-pick-meta">
+                      <span className={`pkg-stock-badge ${pkg.stock <= 10 ? 'low' : ''}`}>
+                        Stok: {pkg.stock} pcs
+                      </span>
+                      <span className={`pkg-price-badge ${isDineIn ? 'free' : ''}`}>
+                        {isDineIn ? 'GRATIS' : `+Rp${fee.toLocaleString('id-ID')}`}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined pkg-pick-arrow">add_circle</span>
+                </button>
+              )
+            })}
+          </div>
 
-        <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Batal
-          </button>
+          <div className="modal-actions" style={{ justifyContent: 'flex-end', marginTop: 4, padding: 0 }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Batal
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
