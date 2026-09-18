@@ -52,7 +52,9 @@ export default function HistoryPage({ onPrint, onNav, onToast }) {
   }, [])
 
   const allOrders = useMemo(() => {
-    return [...offlineOrders, ...(orders || [])]
+    const syncedIds = new Set((orders || []).map((o) => o.id))
+    const pending = offlineOrders.filter((o) => !syncedIds.has(o.id))
+    return [...pending, ...(orders || [])]
   }, [offlineOrders, orders])
 
   function summary(order) {

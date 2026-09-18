@@ -80,7 +80,7 @@ function calcDiscount(subtotal, type, val) {
 /**
  * Menyimpan transaksi saat offline ke IndexedDB dan mengembalikan Order object untuk struk.
  */
-export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
+export async function saveOfflineOrder(payload, cashier, catalogProducts = [], clientOrderId) {
   const db = await openDB()
   const prodMap = new Map((catalogProducts || []).map((p) => [p.id, p]))
 
@@ -109,7 +109,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
   const change = Math.max(0, paid - total)
   const now = new Date()
   const nowISO = now.toISOString()
-  const id = `off-ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+  const id = clientOrderId || `off-ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
   const offlineNumber = getNextOfflineSeq()
 
   const extraPackagings = payload.extraPackagings || []

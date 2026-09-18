@@ -89,19 +89,23 @@ export function getOrders() {
 export async function createOrder(payload, options = {}) {
   const { cashier, products } = options
 
+  // Idempotensi: id dibuat sekali di client agar saat request timeout namun
+  // server sebenarnya sudah menyimpan, retry/offline tidak membuat duplikat.
+  const clientOrderId = `off-ord-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
   // Jika browser offline, langsung simpan secara lokal
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return saveOfflineOrder(payload, cashier, products)
+    return saveOfflineOrder(payload, cashier, products, clientOrderId)
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 4500)
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
 
   try {
     const res = await fetch('/api/orders', {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, clientOrderId }),
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
@@ -114,7 +118,7 @@ export async function createOrder(payload, options = {}) {
     }
     // Jika network error / timeout, simpan ke antrean offline
     console.warn('[api] Gagal terhubung ke cloud/server, menyimpan pesanan secara offline...', err)
-    return saveOfflineOrder(payload, cashier, products)
+    return saveOfflineOrder(payload, cashier, products, clientOrderId)
   }
 }
 
