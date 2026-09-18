@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin, syncOrderToServer, getPackagingFee } from './lib/api'
+import { getCategories, getProducts, getMe, hasAuthToken, setAuthToken, login as apiLogin, syncOrderToServer, getPackagingFee, getPackagings } from './lib/api'
 import {
   cacheCatalog,
   getCachedCatalog,
@@ -27,7 +27,7 @@ function loadCart() {
       const qty = Number(val.qty) || 0
       const note = String(val.note || '')
       if (qty > 0) {
-        normalized[cartItemId] = { cartItemId, productId, qty, note }
+        normalized[cartItemId] = { ...val, cartItemId, productId, qty, note }
       }
     }
     return normalized
@@ -39,6 +39,7 @@ function loadCart() {
 export function ShopProvider({ children }) {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [packagings, setPackagings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [authRequired, setAuthRequired] = useState(false)
@@ -125,14 +126,21 @@ export function ShopProvider({ children }) {
     let active = true
     setLoading(true)
     setError(null)
-    Promise.all([getProducts(), getCategories(), getMe(), getPackagingFee().catch(() => ({ fee: 2000 }))])
-      .then(([p, c, me, feeResp]) => {
+    Promise.all([
+      getProducts(),
+      getCategories(),
+      getMe(),
+      getPackagingFee().catch(() => ({ fee: 2000 })),
+      getPackagings().catch(() => []),
+    ])
+      .then(([p, c, me, feeResp, pkgs]) => {
         if (!active) return
         setProducts(p)
         setCategories(c)
         setUser(me)
         setAuthRequired(false)
         if (feeResp?.fee != null) setPackagingFee(feeResp.fee)
+        if (Array.isArray(pkgs)) setPackagings(pkgs)
         cacheCatalog(p, c, me)
       })
       .catch(async (e) => {
@@ -333,21 +341,12 @@ export function ShopProvider({ children }) {
         note: it.note || '',
       }
     })
-    setCart(nextCart)
+    setCart(newCart)
     if (order.orderType) {
       setOrderType(order.orderType)
+      setTableNo(order.tableNo || '')
     }
-    setTableNo(order.tableNo || '')
-    return true
   }, [])
-
-  const getProductQty = useCallback(
-    (productId) =>
-      Object.values(cart)
-        .filter((it) => it.productId === productId)
-        .reduce((sum, it) => sum + it.qty, 0),
-    [cart]
-  )
 
   const cartItems = useMemo(() => {
     const pMap = new Map(products.map((p) => [p.id, p]))
@@ -366,18 +365,30 @@ export function ShopProvider({ children }) {
     const quickItems = Object.values(cart)
       .filter((it) => it.qty > 0 && it.isQuickPackaging)
       .map((it) => {
-        const isFree = orderType === 'dine_in'
+        const isFree = orderType === 'dine_in' || !orderType
         const effectivePrice = isFree ? 0 : packagingFee
+        const rawName = it.packagingName || 'Kemasan Tambahan'
+        const displayName = isFree ? `${rawName} (Gratis)` : rawName
+        let emoji = '📦'
+        const lower = rawName.toLowerCase()
+        if (lower.includes('bowl') || lower.includes('mangkuk')) emoji = '🥣'
+        else if (lower.includes('gelas') || lower.includes('cup') || lower.includes('minum')) emoji = '🥤'
+        else if (lower.includes('bag') || lower.includes('kantong') || lower.includes('plastik')) emoji = '🛍️'
+        else if (lower.includes('box') || lower.includes('kotak') || lower.includes('nasi')) emoji = '🍱'
+        else if (lower.includes('mika') || lower.includes('kue')) emoji = '🧁'
+
         return {
           id: it.productId,
           cartItemId: it.cartItemId,
-          name: isFree ? 'Kemasan Tambahan (Gratis)' : 'Kemasan Tambahan',
+          packagingId: it.packagingId,
+          packagingName: rawName,
+          name: displayName,
           price: effectivePrice,
           qty: it.qty,
           note: it.note || '',
           isQuickPackaging: true,
           isFreePackaging: isFree,
-          emoji: '📦',
+          emoji,
         }
       })
     return [...regularItems, ...quickItems]
@@ -415,6 +426,7 @@ export function ShopProvider({ children }) {
     count,
     subtotal,
     packagingFee,
+    packagings,
     isOnline,
     pendingSyncCount,
     isSyncing,

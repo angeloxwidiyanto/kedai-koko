@@ -128,6 +128,12 @@ export default function PaymentModal({ onClose, onDone }) {
       const regularItems = cartItems.filter((i) => !i.isQuickPackaging)
       const packagingFeeTotal = quickPackagingTotal
       const packagingQty = quickPackagingQty
+      const extraPackagings = quickPackagingItems.map((i) => ({
+        packagingId: i.packagingId || 'paper-bowl',
+        name: i.packagingName || i.name,
+        qty: i.qty,
+        price: i.price,
+      }))
 
       const order = await createOrder(
         {
@@ -140,6 +146,7 @@ export default function PaymentModal({ onClose, onDone }) {
           discountValue: discValue || 0,
           packagingFeeTotal,
           packagingQty,
+          extraPackagings,
         },
         { cashier: user, products }
       )

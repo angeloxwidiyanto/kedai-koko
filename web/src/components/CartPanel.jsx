@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useShop } from '../shop'
 import { rupiah } from '../lib/format'
+import PackagingPickerModal from './PackagingPickerModal'
 
 const NOTE_PRESETS = ['Kurang gula', 'Tanpa gula', 'Tanpa es', 'Es banyak', 'Pedas', 'Tidak pedas']
 
@@ -31,22 +32,31 @@ function NoteEditor({ item }) {
           <button
             key={p}
             type="button"
-            className={`note-chip ${note === p ? 'active' : ''}`}
-            onClick={() => setNote(itemId, note === p ? '' : p)}
+            className="note-chip"
+            onClick={() => setNote(itemId, note ? `${note}, ${p}` : p)}
           >
             {p}
           </button>
         ))}
       </div>
-      <input
-        className="note-input"
-        value={note}
-        onChange={(e) => setNote(itemId, e.target.value)}
-        placeholder="Contoh: tanpa gula, tanpa es"
-        aria-label="Catatan pesanan"
-        autoFocus
-      />
-      <div className="note-actions">
+      <div className="note-input-row">
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(itemId, e.target.value)}
+          placeholder="Catatan pesanan..."
+          autoFocus
+        />
+        {note && (
+          <button
+            type="button"
+            className="note-clear"
+            onClick={() => setNote(itemId, '')}
+            aria-label="Hapus catatan"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        )}
         <button type="button" className="note-done" onClick={() => setOpen(false)}>
           Selesai
         </button>
@@ -56,7 +66,15 @@ function NoteEditor({ item }) {
 }
 
 export default function CartPanel({ onCheckout }) {
-  const { cartItems, count, subtotal, updateQty, splitItem, addQuickPackaging, packagingFee, orderType, setOrderType } = useShop()
+  const { cartItems, count, subtotal, updateQty, splitItem, addQuickPackaging, packagingFee, packagings, orderType, setOrderType } = useShop()
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const isDineIn = orderType === 'dine_in' || !orderType
+
+  function handleOpenPicker() {
+    if (!orderType) setOrderType('dine_in')
+    setPickerOpen(true)
+  }
 
   return (
     <aside className="cart-panel">
@@ -74,10 +92,7 @@ export default function CartPanel({ onCheckout }) {
               type="button"
               className="btn-quick-packaging free"
               style={{ marginTop: 14 }}
-              onClick={() => {
-                if (!orderType) setOrderType('dine_in')
-                addQuickPackaging(1)
-              }}
+              onClick={handleOpenPicker}
             >
               <span className="material-symbols-outlined">inventory_2</span>
               <span>+ Bungkus Sisa Makanan (Gratis)</span>
@@ -143,15 +158,12 @@ export default function CartPanel({ onCheckout }) {
       <div className="cart-totals">
         <button
           type="button"
-          className={`btn-quick-packaging ${orderType === 'dine_in' || !orderType ? 'free' : ''}`}
-          onClick={() => {
-            if (!orderType) setOrderType('dine_in')
-            addQuickPackaging(1)
-          }}
+          className={`btn-quick-packaging ${isDineIn ? 'free' : ''}`}
+          onClick={handleOpenPicker}
         >
           <span className="material-symbols-outlined">inventory_2</span>
           <span>
-            {orderType === 'dine_in' || !orderType
+            {isDineIn
               ? '+ Kemasan Tambahan (Gratis)'
               : `+ Kemasan Tambahan (+${rupiah(packagingFee)})`}
           </span>
@@ -171,6 +183,21 @@ export default function CartPanel({ onCheckout }) {
           <span className="material-symbols-outlined">arrow_forward</span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {pickerOpen && (
+          <PackagingPickerModal
+            packagings={packagings}
+            isDineIn={isDineIn}
+            fee={packagingFee}
+            onSelect={(pkg) => {
+              if (!orderType) setOrderType('dine_in')
+              addQuickPackaging(pkg, 1)
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </aside>
   )
 }

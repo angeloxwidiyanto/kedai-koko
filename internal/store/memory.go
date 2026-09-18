@@ -563,6 +563,27 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		}
 	}
 
+	for _, ep := range req.ExtraPackagings {
+		if ep.PackagingID != "" && ep.Qty > 0 {
+			for pIdx := range s.packagings {
+				if s.packagings[pIdx].ID == ep.PackagingID {
+					s.packagings[pIdx].Stock -= ep.Qty
+					s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+						ID:           int64(len(s.packagingLogs) + 1),
+						PackagingID:  ep.PackagingID,
+						OrderID:      id,
+						OrderNumber:  orderNumber,
+						ChangeAmount: -ep.Qty,
+						BalanceAfter: s.packagings[pIdx].Stock,
+						Reason:       "order",
+						CreatedAt:    now,
+					})
+					break
+				}
+			}
+		}
+	}
+
 	order := model.Order{
 		ID:                id,
 		Number:            orderNumber,
@@ -572,6 +593,7 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		Subtotal:          subtotal,
 		PackagingFeeTotal: packagingFeeTotal,
 		PackagingQty:      req.PackagingQty,
+		ExtraPackagings:   req.ExtraPackagings,
 		DiscountType:      req.DiscountType,
 		DiscountValue:     req.DiscountValue,
 		DiscountAmount:    discount,

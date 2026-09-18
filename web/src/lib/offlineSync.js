@@ -112,6 +112,8 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
   const id = `off-ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
   const offlineNumber = getNextOfflineSeq()
 
+  const extraPackagings = payload.extraPackagings || []
+
   const orderObj = {
     id,
     number: offlineNumber,
@@ -122,6 +124,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
     subtotal,
     packagingFeeTotal,
     packagingQty,
+    extraPackagings,
     discountType: payload.discountType || '',
     discountValue: payload.discountValue || 0,
     discountAmount: discount,
@@ -148,6 +151,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = []) {
       discountValue: payload.discountValue,
       packagingFeeTotal,
       packagingQty,
+      extraPackagings,
       clientOrderId: id,
       createdAt: nowISO,
     },

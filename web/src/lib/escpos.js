@@ -155,7 +155,11 @@ export function kitchenTicket(order) {
       }
     }
   }
-  if (order.packagingQty > 0) {
+  if (order.extraPackagings && order.extraPackagings.length > 0) {
+    for (const ep of order.extraPackagings) {
+      line(`* Wadah: ${ep.qty}x ${clean(ep.name)}`)
+    }
+  } else if (order.packagingQty > 0) {
     line(`* Kemasan: ${order.packagingQty} pcs`)
   }
   divider()
@@ -203,7 +207,13 @@ export function receipt(order) {
   divider()
 
   line(twoCol('Subtotal', rupiah(order.subtotal || order.total)))
-  if (order.packagingFeeTotal > 0) {
+  if (order.extraPackagings && order.extraPackagings.length > 0) {
+    for (const ep of order.extraPackagings) {
+      const label = `${ep.qty}x ${ep.name}`
+      const priceText = ep.price > 0 ? rupiah(ep.price * ep.qty) : 'GRATIS'
+      line(twoCol(label, priceText))
+    }
+  } else if (order.packagingFeeTotal > 0) {
     line(twoCol(`Biaya Kemasan${order.packagingQty ? ' (' + order.packagingQty + 'x)' : ''}`, rupiah(order.packagingFeeTotal)))
   } else if (order.packagingQty > 0) {
     line(twoCol(`Kemasan (${order.packagingQty}x)`, 'GRATIS'))

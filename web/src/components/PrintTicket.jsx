@@ -44,13 +44,21 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
         </div>
       ))}
 
-      {order.packagingQty > 0 && !isReceipt && (
+      {order.extraPackagings && order.extraPackagings.length > 0 ? (
+        order.extraPackagings.map((ep, idx) => (
+          <div key={idx} className="pt-item" style={{ fontStyle: 'italic' }}>
+            <div className="pt-line">
+              <span className="pt-name">* Wadah: {ep.qty}x {ep.name}</span>
+            </div>
+          </div>
+        ))
+      ) : order.packagingQty > 0 && !isReceipt ? (
         <div className="pt-item" style={{ fontStyle: 'italic' }}>
           <div className="pt-line">
             <span className="pt-name">* Kemasan: {order.packagingQty} pcs</span>
           </div>
         </div>
-      )}
+      ) : null}
 
       {isReceipt ? (
         <>
@@ -59,17 +67,30 @@ export default function PrintTicket({ order, kind = 'kitchen' }) {
             <span>Subtotal</span>
             <span>{rupiah(order.subtotal || order.total)}</span>
           </div>
-          {order.packagingFeeTotal > 0 && (
-            <div className="pt-row">
-              <span>Biaya Kemasan{order.packagingQty ? ` (${order.packagingQty}x)` : ''}</span>
-              <span>{rupiah(order.packagingFeeTotal)}</span>
-            </div>
-          )}
-          {order.packagingQty > 0 && (!order.packagingFeeTotal || order.packagingFeeTotal === 0) && (
-            <div className="pt-row">
-              <span>Kemasan ({order.packagingQty}x)</span>
-              <span style={{ fontWeight: 600 }}>GRATIS</span>
-            </div>
+          {order.extraPackagings && order.extraPackagings.length > 0 ? (
+            order.extraPackagings.map((ep, idx) => (
+              <div key={idx} className="pt-row">
+                <span>{ep.name} ({ep.qty}x)</span>
+                <span style={ep.price === 0 ? { fontWeight: 600 } : undefined}>
+                  {ep.price === 0 ? 'GRATIS' : rupiah(ep.price * ep.qty)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <>
+              {order.packagingFeeTotal > 0 && (
+                <div className="pt-row">
+                  <span>Biaya Kemasan{order.packagingQty ? ` (${order.packagingQty}x)` : ''}</span>
+                  <span>{rupiah(order.packagingFeeTotal)}</span>
+                </div>
+              )}
+              {order.packagingQty > 0 && (!order.packagingFeeTotal || order.packagingFeeTotal === 0) && (
+                <div className="pt-row">
+                  <span>Kemasan ({order.packagingQty}x)</span>
+                  <span style={{ fontWeight: 600 }}>GRATIS</span>
+                </div>
+              )}
+            </>
           )}
           {order.discountAmount > 0 && (
             <div className="pt-row">

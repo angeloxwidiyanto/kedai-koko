@@ -929,6 +929,11 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 			}
 		}
 	}
+	for _, ep := range req.ExtraPackagings {
+		if ep.PackagingID != "" && ep.Qty > 0 {
+			pkgNeeded[ep.PackagingID] += ep.Qty
+		}
+	}
 
 	// Deduct and lock multi-packagings
 	type pkgUpdate struct {
@@ -1015,6 +1020,7 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		Subtotal:          subtotal,
 		PackagingFeeTotal: packagingFeeTotal,
 		PackagingQty:      req.PackagingQty,
+		ExtraPackagings:   req.ExtraPackagings,
 		DiscountType:      req.DiscountType,
 		DiscountValue:     req.DiscountValue,
 		DiscountAmount:    discount,
