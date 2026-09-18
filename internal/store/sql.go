@@ -734,7 +734,7 @@ func (s *SQLStore) Authenticate(id, pin string) (model.User, error) {
 
 // --- Pesanan ---
 
-const orderCols = `id, number, order_type, table_no, subtotal, packaging_fee_total, packaging_qty, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
+const orderCols = `id, number, order_type, table_no, subtotal, COALESCE(packaging_fee_total, 0), COALESCE(packaging_qty, 0), discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
 
 func scanOrder(row pgx.Row) (model.Order, error) {
 	var o model.Order
@@ -1606,7 +1606,7 @@ func (s *SQLStore) PackagingLogs(limit int) ([]model.PackagingLog, error) {
 		limit = 100
 	}
 	query := `
-		SELECT l.id, l.packaging_id, COALESCE(p.name, l.packaging_id), l.order_id, l.order_number, l.change_amount, l.balance_after, l.reason, l.created_at
+		SELECT l.id, l.packaging_id, COALESCE(p.name, l.packaging_id), COALESCE(l.order_id, ''), COALESCE(l.order_number, ''), l.change_amount, l.balance_after, COALESCE(l.reason, ''), l.created_at
 		FROM packaging_logs l
 		LEFT JOIN packagings p ON p.id = l.packaging_id
 		ORDER BY l.id DESC
