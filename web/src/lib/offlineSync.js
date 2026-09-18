@@ -338,7 +338,9 @@ export async function discardPendingOrder(id) {
  * Sinkronisasi satu pesanan offline tertentu ke backend.
  */
 function isPermanentError(err) {
-  return !!err && typeof err.status === 'number' && err.status >= 400 && err.status < 500
+  // 401/403 bersifat transien (token kedaluwarsa/hak akses) — setelah login
+  // ulang sync bisa lanjut otomatis, jadi jangan ditandai permanen.
+  return !!err && typeof err.status === 'number' && err.status >= 400 && err.status < 500 && err.status !== 401 && err.status !== 403
 }
 
 // Backfill snapshot item (nama/harga/emoji) dari record.order ke payload.

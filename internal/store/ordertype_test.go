@@ -291,3 +291,39 @@ func TestBypassValidationWithSnapshotPrice(t *testing.T) {
 		t.Fatalf("expected item snapshot (price 30000, name Nasi Uduk), got %+v", o.Items)
 	}
 }
+
+func TestIdempotentSyncNoDoubleStockDeduction(t *testing.T) {
+	s := newTestStore()
+	if _, err := s.SetProductStock("rice-3", 5); err != nil {
+		t.Fatal(err)
+	}
+
+	req := model.CreateOrderRequest{
+		ClientOrderID:    "off-ord-xyz",
+		BypassValidation: true,
+		Items:            []model.OrderItemInput{itemReq("rice-3", 2, "")},
+		Paid:             110000,
+		PaymentMethod:    "tunai",
+		OrderType:        "take_away",
+	}
+
+	if _, err := s.CreateOrder(req, testAdmin()); err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	// retry idempotent dengan clientOrderId sama (simulasi re-sync phantom)
+	o2, err := s.CreateOrder(req, testAdmin())
+	if err != nil {
+		t.Fatalf("retry create: %v", err)
+	}
+	if o2.ID != "off-ord-xyz" {
+		t.Fatalf("expected idempotent id off-ord-xyz, got %s", o2.ID)
+	}
+
+	// stok hanya terpotong sekali (5 -> 3), bukan dua kali
+	prod, _ := s.ProductsAdmin()
+	for _, p := range prod {
+		if p.ID == "rice-3" && p.Stock != 3 {
+			t.Fatalf("expected stock 3 (deducted once), got %d", p.Stock)
+		}
+	}
+}
