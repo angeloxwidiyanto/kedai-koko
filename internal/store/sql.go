@@ -761,14 +761,22 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		}
 	}
 
-	if len(req.Items) == 0 {
+	if len(req.Items) == 0 && req.PackagingQty == 0 {
 		return model.Order{}, ErrEmptyOrder
 	}
 	if req.OrderType != "dine_in" && req.OrderType != "take_away" {
-		return model.Order{}, ErrOrderTypeRequired
+		if req.PackagingQty > 0 {
+			req.OrderType = "dine_in"
+		} else {
+			return model.Order{}, ErrOrderTypeRequired
+		}
 	}
 	if req.OrderType == "dine_in" && req.TableNo == "" {
-		return model.Order{}, ErrTableNoRequired
+		if req.PackagingQty > 0 && len(req.Items) == 0 {
+			req.TableNo = "-"
+		} else {
+			return model.Order{}, ErrTableNoRequired
+		}
 	}
 	if req.PaymentMethod != "qris" && req.PaymentMethod != "tunai" {
 		return model.Order{}, ErrPaymentMethod
@@ -785,12 +793,6 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		ids[i] = it.ProductID
 	}
 
-	rows, err := tx.Query(ctx,
-		`SELECT id, name, emoji, price, available, archived, stock, COALESCE(packaging_id, ''), COALESCE(packaging_rule, 'take_away_only') FROM products WHERE id = ANY($1::text[]) FOR UPDATE`, ids)
-	if err != nil {
-		return model.Order{}, err
-	}
-
 	type productRow struct {
 		id, name, emoji string
 		price           int
@@ -801,17 +803,24 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		packagingRule   string
 	}
 	products := map[string]productRow{}
-	for rows.Next() {
-		var pr productRow
-		if err := rows.Scan(&pr.id, &pr.name, &pr.emoji, &pr.price, &pr.available, &pr.archived, &pr.stock, &pr.packagingID, &pr.packagingRule); err != nil {
-			rows.Close()
+	if len(ids) > 0 {
+		rows, err := tx.Query(ctx,
+			`SELECT id, name, emoji, price, available, archived, stock, COALESCE(packaging_id, ''), COALESCE(packaging_rule, 'take_away_only') FROM products WHERE id = ANY($1::text[]) FOR UPDATE`, ids)
+		if err != nil {
 			return model.Order{}, err
 		}
-		products[pr.id] = pr
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return model.Order{}, err
+		for rows.Next() {
+			var pr productRow
+			if err := rows.Scan(&pr.id, &pr.name, &pr.emoji, &pr.price, &pr.available, &pr.archived, &pr.stock, &pr.packagingID, &pr.packagingRule); err != nil {
+				rows.Close()
+				return model.Order{}, err
+			}
+			products[pr.id] = pr
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return model.Order{}, err
+		}
 	}
 
 	items := make([]model.OrderItem, 0, len(req.Items))

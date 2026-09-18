@@ -1,0 +1,4 @@
+=== RUN   TestFreePackagingOnlyOrder
+--- PASS: TestFreePackagingOnlyOrder (0.09s)
+PASS
+ok  	kedaikoko/internal/store	0.630s

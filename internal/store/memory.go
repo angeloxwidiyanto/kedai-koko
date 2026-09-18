@@ -418,14 +418,22 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 		}
 	}
 
-	if len(req.Items) == 0 {
+	if len(req.Items) == 0 && req.PackagingQty == 0 {
 		return model.Order{}, ErrEmptyOrder
 	}
 	if req.OrderType != "dine_in" && req.OrderType != "take_away" {
-		return model.Order{}, ErrOrderTypeRequired
+		if req.PackagingQty > 0 {
+			req.OrderType = "dine_in"
+		} else {
+			return model.Order{}, ErrOrderTypeRequired
+		}
 	}
 	if req.OrderType == "dine_in" && req.TableNo == "" {
-		return model.Order{}, ErrTableNoRequired
+		if req.PackagingQty > 0 && len(req.Items) == 0 {
+			req.TableNo = "-"
+		} else {
+			return model.Order{}, ErrTableNoRequired
+		}
 	}
 	if req.PaymentMethod != "qris" && req.PaymentMethod != "tunai" {
 		return model.Order{}, ErrPaymentMethod

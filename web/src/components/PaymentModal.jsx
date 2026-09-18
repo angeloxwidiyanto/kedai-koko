@@ -99,7 +99,15 @@ export default function PaymentModal({ onClose, onDone }) {
   const total = Math.max(0, subtotal - discountAmount)
   const change = payMethod === 'qris' ? 0 : paid - total
   const packagingOk = packagingStatus.ok
-  const canPay = total > 0 && (payMethod === 'qris' ? true : change >= 0) && packagingOk && !!orderType && (orderType !== 'dine_in' || !!tableNo.trim())
+  const isFreePackagingOnly = total === 0 && quickPackagingQty > 0
+  const effectiveOrderType = orderType || (isFreePackagingOnly ? 'dine_in' : '')
+  const needsTable = effectiveOrderType === 'dine_in' && cartItems.some((i) => !i.isQuickPackaging)
+  const canPay =
+    (total > 0 || isFreePackagingOnly) &&
+    (payMethod === 'qris' ? true : change >= 0) &&
+    packagingOk &&
+    !!effectiveOrderType &&
+    (!needsTable || !!tableNo.trim())
 
   function pick(value) {
     setErr(null)
@@ -126,8 +134,8 @@ export default function PaymentModal({ onClose, onDone }) {
           items: regularItems.map((i) => ({ productId: i.id, qty: i.qty, note: i.note || '' })),
           paid,
           paymentMethod: payMethod,
-          orderType,
-          tableNo: orderType === 'dine_in' ? tableNo.trim() : '',
+          orderType: effectiveOrderType || 'dine_in',
+          tableNo: effectiveOrderType === 'dine_in' ? (tableNo.trim() || '-') : '',
           discountType: discType || '',
           discountValue: discValue || 0,
           packagingFeeTotal,

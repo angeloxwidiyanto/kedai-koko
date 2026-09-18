@@ -56,7 +56,7 @@ function NoteEditor({ item }) {
 }
 
 export default function CartPanel({ onCheckout }) {
-  const { cartItems, count, subtotal, updateQty, splitItem, addQuickPackaging, packagingFee, orderType } = useShop()
+  const { cartItems, count, subtotal, updateQty, splitItem, addQuickPackaging, packagingFee, orderType, setOrderType } = useShop()
 
   return (
     <aside className="cart-panel">
@@ -70,6 +70,18 @@ export default function CartPanel({ onCheckout }) {
           <div className="cart-empty">
             <span className="material-symbols-outlined">shopping_basket</span>
             <p>Keranjang masih kosong</p>
+            <button
+              type="button"
+              className="btn-quick-packaging free"
+              style={{ marginTop: 14 }}
+              onClick={() => {
+                if (!orderType) setOrderType('dine_in')
+                addQuickPackaging(1)
+              }}
+            >
+              <span className="material-symbols-outlined">inventory_2</span>
+              <span>+ Bungkus Sisa Makanan (Gratis)</span>
+            </button>
           </div>
         ) : (
           <AnimatePresence initial={false}>
@@ -129,20 +141,21 @@ export default function CartPanel({ onCheckout }) {
       </div>
 
       <div className="cart-totals">
-        {cartItems.length > 0 && (
-          <button
-            type="button"
-            className={`btn-quick-packaging ${orderType === 'dine_in' ? 'free' : ''}`}
-            onClick={() => addQuickPackaging(1)}
-          >
-            <span className="material-symbols-outlined">inventory_2</span>
-            <span>
-              {orderType === 'dine_in'
-                ? '+ Kemasan Tambahan (Gratis)'
-                : `+ Kemasan Tambahan (+${rupiah(packagingFee)})`}
-            </span>
-          </button>
-        )}
+        <button
+          type="button"
+          className={`btn-quick-packaging ${orderType === 'dine_in' || !orderType ? 'free' : ''}`}
+          onClick={() => {
+            if (!orderType) setOrderType('dine_in')
+            addQuickPackaging(1)
+          }}
+        >
+          <span className="material-symbols-outlined">inventory_2</span>
+          <span>
+            {orderType === 'dine_in' || !orderType
+              ? '+ Kemasan Tambahan (Gratis)'
+              : `+ Kemasan Tambahan (+${rupiah(packagingFee)})`}
+          </span>
+        </button>
 
         <div className="row">
           <span>Total</span>

@@ -142,3 +142,26 @@ func TestPackagingStockMethods(t *testing.T) {
 		t.Fatalf("expected ErrInvalidPackaging, got %v", err)
 	}
 }
+
+func TestFreePackagingOnlyOrder(t *testing.T) {
+	s := newTestStore()
+	s.packaging = 10
+
+	o, err := s.CreateOrder(model.CreateOrderRequest{
+		Items:         []model.OrderItemInput{},
+		PackagingQty:  2,
+		PaymentMethod: "tunai",
+	}, testAdmin())
+	if err != nil {
+		t.Fatalf("free packaging only order should succeed: %v", err)
+	}
+	if o.Total != 0 {
+		t.Fatalf("expected total 0, got %d", o.Total)
+	}
+	if o.PackagingQty != 2 {
+		t.Fatalf("expected packaging qty 2, got %d", o.PackagingQty)
+	}
+	if s.packaging != 8 {
+		t.Fatalf("expected packaging stock to be 8, got %d", s.packaging)
+	}
+}
