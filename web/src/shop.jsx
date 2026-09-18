@@ -237,8 +237,20 @@ export function ShopProvider({ children }) {
   // Tambah kemasan cepat (quick packaging)
   // dine-in → gratis (Rp0, tracking only)
   // take-away → kena packagingFee
-  const addQuickPackaging = useCallback((qty = 1, overridePrice = null) => {
-    const productId = '__quick_packaging__'
+  const addQuickPackaging = useCallback((pkgOrQty = 1, maybeQty = 1) => {
+    let pkg = null
+    let qty = 1
+    if (typeof pkgOrQty === 'object' && pkgOrQty !== null) {
+      pkg = pkgOrQty
+      qty = typeof maybeQty === 'number' ? maybeQty : 1
+    } else if (typeof pkgOrQty === 'number') {
+      qty = pkgOrQty
+    }
+
+    const pkgId = pkg?.id || 'general'
+    const pkgName = pkg?.name || 'Kemasan Tambahan'
+    const productId = `__quick_packaging_${pkgId}__`
+
     setCart((prev) => {
       const existing = Object.values(prev).find((it) => it.productId === productId)
       if (existing) {
@@ -256,10 +268,11 @@ export function ShopProvider({ children }) {
         [cartItemId]: {
           cartItemId,
           productId,
+          packagingId: pkg?.id || null,
+          packagingName: pkgName,
           qty,
           note: '',
           isQuickPackaging: true,
-          overridePrice,  // null = gunakan packagingFee, 0 = gratis
         },
       }
     })
@@ -322,6 +335,15 @@ export function ShopProvider({ children }) {
     })
   }, [])
 
+  const getProductQty = useCallback(
+    (productId) => {
+      return Object.values(cart)
+        .filter((it) => it.productId === productId)
+        .reduce((sum, it) => sum + it.qty, 0)
+    },
+    [cart]
+  )
+
   const clear = useCallback(() => {
     setCart({})
     setOrderType(null)
@@ -341,7 +363,7 @@ export function ShopProvider({ children }) {
         note: it.note || '',
       }
     })
-    setCart(newCart)
+    setCart(nextCart)
     if (order.orderType) {
       setOrderType(order.orderType)
       setTableNo(order.tableNo || '')

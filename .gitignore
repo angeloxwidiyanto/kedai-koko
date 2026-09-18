@@ -1,6 +1,7 @@
 # Go
 bin/
 *.exe
+.cache/
 
 # Node
 node_modules/
