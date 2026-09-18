@@ -366,21 +366,22 @@ export function ShopProvider({ children }) {
     const quickItems = Object.values(cart)
       .filter((it) => it.qty > 0 && it.isQuickPackaging)
       .map((it) => {
-        const effectivePrice = it.overridePrice !== null && it.overridePrice !== undefined ? it.overridePrice : packagingFee
+        const isFree = orderType === 'dine_in'
+        const effectivePrice = isFree ? 0 : packagingFee
         return {
           id: it.productId,
           cartItemId: it.cartItemId,
-          name: effectivePrice === 0 ? 'Kemasan Tambahan (Gratis)' : 'Kemasan Tambahan',
+          name: isFree ? 'Kemasan Tambahan (Gratis)' : 'Kemasan Tambahan',
           price: effectivePrice,
           qty: it.qty,
           note: it.note || '',
           isQuickPackaging: true,
-          isFreePackaging: effectivePrice === 0,
+          isFreePackaging: isFree,
           emoji: '📦',
         }
       })
     return [...regularItems, ...quickItems]
-  }, [products, cart, packagingFee])
+  }, [products, cart, packagingFee, orderType])
 
   const count = useMemo(() => cartItems.reduce((s, i) => s + i.qty, 0), [cartItems])
   const subtotal = useMemo(() => cartItems.reduce((s, i) => s + i.qty * i.price, 0), [cartItems])

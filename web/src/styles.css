@@ -870,6 +870,40 @@ button {
   flex-direction: column;
   gap: 14px;
 }
+.btn-quick-packaging {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface-low, #f5f1ed);
+  border: 1.5px dashed var(--outline, #8a7561);
+  border-radius: var(--r-md, 10px);
+  color: var(--on-surface, #2a241e);
+  font-size: var(--fs-label-md, 13px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-quick-packaging:hover {
+  background: var(--surface, #ede6df);
+  border-color: var(--primary, #b45309);
+  color: var(--primary, #b45309);
+}
+.btn-quick-packaging .material-symbols-outlined {
+  font-size: 18px;
+}
+.btn-quick-packaging.free {
+  background: #f0fdf4;
+  border-color: #22c55e;
+  color: #15803d;
+}
+.btn-quick-packaging.free:hover {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #166534;
+}
 .cart-totals .row {
   display: flex;
   justify-content: space-between;
