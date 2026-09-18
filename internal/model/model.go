@@ -101,6 +101,9 @@ type OrderItemInput struct {
 	ProductID string `json:"productId"`
 	Qty       int    `json:"qty"`
 	Note      string `json:"note,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Price     int    `json:"price,omitempty"`
+	Emoji     string `json:"emoji,omitempty"`
 }
 
 type CreateOrderRequest struct {

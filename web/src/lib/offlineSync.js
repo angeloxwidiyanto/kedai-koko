@@ -142,7 +142,7 @@ export async function saveOfflineOrder(payload, cashier, catalogProducts = [], c
     id,
     tempNumber: offlineNumber,
     payload: {
-      items: payload.items.map((i) => ({ productId: i.productId, qty: i.qty, note: i.note || '' })),
+      items: enrichedItems.map((i) => ({ productId: i.productId, qty: i.qty, note: i.note || '', name: i.name, price: i.price, emoji: i.emoji })),
       paid,
       paymentMethod: payload.paymentMethod,
       orderType: payload.orderType,
@@ -341,6 +341,29 @@ function isPermanentError(err) {
   return !!err && typeof err.status === 'number' && err.status >= 400 && err.status < 500
 }
 
+// Backfill snapshot item (nama/harga/emoji) dari record.order ke payload.
+// Order lama hanya menyimpan {productId,qty,note} di payload, sehingga perlu
+// diisi ulang dari snapshot agar server menghitung total dengan harga yang benar.
+function enrichPayloadForSync(record) {
+  const payload = record.payload || {}
+  const snapItems = record.order?.items || []
+  if (!Array.isArray(snapItems) || snapItems.length === 0) {
+    return payload
+  }
+  const items = (payload.items || []).map((it, idx) => {
+    const snap = snapItems[idx] || {}
+    return {
+      productId: it.productId,
+      qty: it.qty,
+      note: it.note || '',
+      name: snap.name || it.name || '',
+      price: snap.price || it.price || 0,
+      emoji: snap.emoji || it.emoji || '',
+    }
+  })
+  return { ...payload, items }
+}
+
 export async function syncSingleOrder(id, syncHandler) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error('Perangkat sedang offline. Sambungkan ke internet terlebih dahulu.')
@@ -358,7 +381,7 @@ export async function syncSingleOrder(id, syncHandler) {
   }
 
   try {
-    const res = await syncHandler(record.payload)
+    const res = await syncHandler(enrichPayloadForSync(record))
     await removePendingOrder(id)
     return res
   } catch (err) {
@@ -389,7 +412,7 @@ export async function syncPendingOrders(syncHandler) {
     const pendingList = await getRetryableOrders()
     for (const item of pendingList) {
       try {
-        await syncHandler(item.payload)
+        await syncHandler(enrichPayloadForSync(item))
         await removePendingOrder(item.id)
         syncedCount++
       } catch (err) {

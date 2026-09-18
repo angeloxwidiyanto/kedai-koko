@@ -249,3 +249,45 @@ func TestBypassValidation(t *testing.T) {
 		t.Fatalf("archived bypass order should succeed: %v", err)
 	}
 }
+
+func TestBypassValidationWithSnapshotPrice(t *testing.T) {
+	s := newTestStore()
+
+	// naikkan harga produk saat ini (simulasi price drift)
+	ps, err := s.ProductsAdmin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range ps {
+		if ps[i].ID == "rice-1" {
+			ps[i].Price = 40000
+			if _, err := s.UpdateProduct(ps[i]); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// snapshot harga lama 30000 + bypass -> total pakai harga snapshot
+	o, err := s.CreateOrder(model.CreateOrderRequest{
+		Items: []model.OrderItemInput{{
+			ProductID: "rice-1",
+			Qty:       2,
+			Name:      "Nasi Uduk",
+			Price:     30000,
+			Emoji:     "🍛",
+		}},
+		Paid:             60000,
+		PaymentMethod:    "tunai",
+		OrderType:        "take_away",
+		BypassValidation: true,
+	}, testAdmin())
+	if err != nil {
+		t.Fatalf("snapshot bypass order: %v", err)
+	}
+	if o.Subtotal != 60000 || o.Total != 60000 {
+		t.Fatalf("expected total from snapshot 60000, got subtotal=%d total=%d", o.Subtotal, o.Total)
+	}
+	if len(o.Items) != 1 || o.Items[0].Price != 30000 || o.Items[0].Name != "Nasi Uduk" {
+		t.Fatalf("expected item snapshot (price 30000, name Nasi Uduk), got %+v", o.Items)
+	}
+}

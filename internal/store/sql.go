@@ -841,31 +841,45 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 	subtotal := 0
 	totalQty := 0
 	for _, it := range req.Items {
-		pr, ok := products[it.ProductID]
-		if !ok {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
-		}
-		if pr.archived && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, pr.name)
-		}
-		if !pr.available && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
-		}
 		if it.Qty <= 0 {
 			return model.Order{}, ErrInvalidQty
 		}
-		if pr.stock >= 0 && it.Qty > pr.stock && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
+		pr, ok := products[it.ProductID]
+		if !ok && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
+		}
+		if ok {
+			if pr.archived && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, pr.name)
+			}
+			if !pr.available && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
+			}
+			if pr.stock >= 0 && it.Qty > pr.stock && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, pr.name)
+			}
+		}
+		name, emoji, price := pr.name, pr.emoji, pr.price
+		if req.BypassValidation {
+			if it.Name != "" {
+				name = it.Name
+			}
+			if it.Emoji != "" {
+				emoji = it.Emoji
+			}
+			if it.Price > 0 {
+				price = it.Price
+			}
 		}
 		items = append(items, model.OrderItem{
-			ProductID: pr.id,
-			Name:      pr.name,
-			Emoji:     pr.emoji,
-			Price:     pr.price,
+			ProductID: it.ProductID,
+			Name:      name,
+			Emoji:     emoji,
+			Price:     price,
 			Qty:       it.Qty,
 			Note:      it.Note,
 		})
-		subtotal += pr.price * it.Qty
+		subtotal += price * it.Qty
 		totalQty += it.Qty
 	}
 

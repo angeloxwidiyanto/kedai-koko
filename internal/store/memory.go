@@ -443,32 +443,47 @@ func (s *MemoryStore) CreateOrder(req model.CreateOrderRequest, cashier model.Us
 	subtotal := 0
 	totalQty := 0
 	for _, it := range req.Items {
-		idx := s.indexOfProduct(it.ProductID)
-		if idx < 0 {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
-		}
-		p := &s.products[idx]
-		if p.Archived && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, p.Name)
-		}
-		if !p.Available && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
-		}
 		if it.Qty <= 0 {
 			return model.Order{}, ErrInvalidQty
 		}
-		if p.Stock >= 0 && it.Qty > p.Stock && !req.BypassValidation {
-			return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
+		idx := s.indexOfProduct(it.ProductID)
+		if idx < 0 && !req.BypassValidation {
+			return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, it.ProductID)
+		}
+		name, emoji, price := "", "", 0
+		if idx >= 0 {
+			p := &s.products[idx]
+			name, emoji, price = p.Name, p.Emoji, p.Price
+			if p.Archived && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductNotFound, p.Name)
+			}
+			if !p.Available && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
+			}
+			if p.Stock >= 0 && it.Qty > p.Stock && !req.BypassValidation {
+				return model.Order{}, fmt.Errorf("%w: %s", ErrProductUnavailable, p.Name)
+			}
+		}
+		if req.BypassValidation {
+			if it.Name != "" {
+				name = it.Name
+			}
+			if it.Emoji != "" {
+				emoji = it.Emoji
+			}
+			if it.Price > 0 {
+				price = it.Price
+			}
 		}
 		items = append(items, model.OrderItem{
-			ProductID: p.ID,
-			Name:      p.Name,
-			Emoji:     p.Emoji,
-			Price:     p.Price,
+			ProductID: it.ProductID,
+			Name:      name,
+			Emoji:     emoji,
+			Price:     price,
 			Qty:       it.Qty,
 			Note:      it.Note,
 		})
-		subtotal += p.Price * it.Qty
+		subtotal += price * it.Qty
 		totalQty += it.Qty
 	}
 
