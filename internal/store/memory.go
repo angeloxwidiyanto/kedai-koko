@@ -649,6 +649,10 @@ func (s *MemoryStore) VoidOrder(id, reason, by string) (model.Order, error) {
 					s.packaging += it.Qty
 				}
 			}
+			// kembalikan stok kemasan tambahan (legacy)
+			if s.orders[i].PackagingQty > 0 {
+				s.packaging += s.orders[i].PackagingQty
+			}
 
 			// kembalikan stok multi-kemasan
 			for _, it := range s.orders[i].Items {
@@ -682,6 +686,29 @@ func (s *MemoryStore) VoidOrder(id, reason, by string) (model.Order, error) {
 								break
 							}
 						}
+					}
+				}
+			}
+
+			// kembalikan stok kemasan tambahan (multi-kemasan)
+			for _, ep := range s.orders[i].ExtraPackagings {
+				if ep.PackagingID == "" || ep.Qty <= 0 {
+					continue
+				}
+				for pIdx := range s.packagings {
+					if s.packagings[pIdx].ID == ep.PackagingID {
+						s.packagings[pIdx].Stock += ep.Qty
+						s.packagingLogs = append(s.packagingLogs, model.PackagingLog{
+							ID:           int64(len(s.packagingLogs) + 1),
+							PackagingID:  ep.PackagingID,
+							OrderID:      s.orders[i].ID,
+							OrderNumber:  s.orders[i].Number,
+							ChangeAmount: ep.Qty,
+							BalanceAfter: s.packagings[pIdx].Stock,
+							Reason:       "void_restored",
+							CreatedAt:    now,
+						})
+						break
 					}
 				}
 			}

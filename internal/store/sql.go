@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -155,6 +156,7 @@ func (s *SQLStore) migrate(ctx context.Context) error {
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_rule text NOT NULL DEFAULT 'take_away_only'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS packaging_fee_total int NOT NULL DEFAULT 0`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS packaging_qty int NOT NULL DEFAULT 0`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS extra_packagings text NOT NULL DEFAULT ''`,
 	}
 
 	for _, st := range stmts {
@@ -736,14 +738,24 @@ func (s *SQLStore) Authenticate(id, pin string) (model.User, error) {
 
 // --- Pesanan ---
 
-const orderCols = `id, number, order_type, table_no, subtotal, COALESCE(packaging_fee_total, 0), COALESCE(packaging_qty, 0), discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
+const orderCols = `id, number, order_type, table_no, subtotal, COALESCE(packaging_fee_total, 0), COALESCE(packaging_qty, 0), COALESCE(extra_packagings, ''), discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, voided_at, void_reason, voided_by, created_at`
 
 func scanOrder(row pgx.Row) (model.Order, error) {
 	var o model.Order
-	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.PackagingFeeTotal, &o.PackagingQty, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
+	var extraJSON string
+	err := row.Scan(&o.ID, &o.Number, &o.OrderType, &o.TableNo, &o.Subtotal, &o.PackagingFeeTotal, &o.PackagingQty, &extraJSON, &o.DiscountType, &o.DiscountValue, &o.DiscountAmount,
 		&o.Total, &o.Paid, &o.Change, &o.PaymentMethod, &o.Status, &o.CashierID, &o.CashierName,
 		&o.VoidedAt, &o.VoidReason, &o.VoidedBy, &o.CreatedAt)
-	return o, err
+	if err != nil {
+		return o, err
+	}
+	if extraJSON != "" {
+		var eps []model.OrderPackagingInput
+		if err := json.Unmarshal([]byte(extraJSON), &eps); err == nil {
+			o.ExtraPackagings = eps
+		}
+	}
+	return o, nil
 }
 
 func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User) (model.Order, error) {
@@ -984,10 +996,17 @@ func (s *SQLStore) CreateOrder(req model.CreateOrderRequest, cashier model.User)
 		now = *req.CreatedAt
 	}
 
+	extraJSON := "[]"
+	if len(req.ExtraPackagings) > 0 {
+		if b, err := json.Marshal(req.ExtraPackagings); err == nil {
+			extraJSON = string(b)
+		}
+	}
+
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO orders (id, number, order_type, table_no, subtotal, packaging_fee_total, packaging_qty, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'paid', $15, $16, $17)`,
-		id, number, req.OrderType, req.TableNo, subtotal, packagingFeeTotal, req.PackagingQty, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
+		`INSERT INTO orders (id, number, order_type, table_no, subtotal, packaging_fee_total, packaging_qty, extra_packagings, discount_type, discount_value, discount_amount, total, paid, change_amount, payment_method, status, cashier_id, cashier_name, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'paid', $16, $17, $18)`,
+		id, number, req.OrderType, req.TableNo, subtotal, packagingFeeTotal, req.PackagingQty, extraJSON, req.DiscountType, req.DiscountValue, discount, total, paid, change, req.PaymentMethod, cashier.ID, cashier.Name, now); err != nil {
 		return model.Order{}, err
 	}
 
@@ -1055,9 +1074,16 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 		return model.Order{}, ErrOrderNotPaid
 	}
 
-	// ambil jenis pesanan dan nomor pesanan untuk kembalikan kemasan
+	// ambil jenis pesanan, nomor pesanan, dan rincian kemasan untuk dikembalikan
 	var orderType, orderNumber string
-	_ = tx.QueryRow(ctx, `SELECT order_type, number FROM orders WHERE id=$1`, id).Scan(&orderType, &orderNumber)
+	var packagingQty int
+	var extraJSON string
+	_ = tx.QueryRow(ctx, `SELECT order_type, number, COALESCE(packaging_qty, 0), COALESCE(extra_packagings, '') FROM orders WHERE id=$1`, id).Scan(&orderType, &orderNumber, &packagingQty, &extraJSON)
+
+	var extraPackagings []model.OrderPackagingInput
+	if extraJSON != "" {
+		_ = json.Unmarshal([]byte(extraJSON), &extraPackagings)
+	}
 
 	// kembalikan stok
 	itemRows, err := tx.Query(ctx, `SELECT product_id, qty FROM order_items WHERE order_id=$1`, id)
@@ -1087,18 +1113,20 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 		}
 	}
 
-	// kembalikan stok kemasan untuk bungkus (legacy)
+	// kembalikan stok kemasan untuk bungkus (legacy) + kemasan tambahan
+	totalQty := 0
+	for _, sr := range restores {
+		totalQty += sr.qty
+	}
+	legacyRestore := packagingQty
 	if orderType == "take_away" {
-		totalQty := 0
-		for _, sr := range restores {
-			totalQty += sr.qty
-		}
-		if totalQty > 0 {
-			if _, err := tx.Exec(ctx,
-				`UPDATE settings SET value=(COALESCE((SELECT value::int FROM settings WHERE key='packaging_stock'),0) + $2)::text WHERE key='packaging_stock'`,
-				totalQty); err != nil {
-				return model.Order{}, err
-			}
+		legacyRestore += totalQty
+	}
+	if legacyRestore > 0 {
+		if _, err := tx.Exec(ctx,
+			`UPDATE settings SET value=(COALESCE((SELECT value::int FROM settings WHERE key='packaging_stock'),0) + $2)::text WHERE key='packaging_stock'`,
+			legacyRestore); err != nil {
+			return model.Order{}, err
 		}
 	}
 
@@ -1117,6 +1145,11 @@ func (s *SQLStore) VoidOrder(id, reason, by string) (model.Order, error) {
 			if needs {
 				pkgRestores[pkgID] += sr.qty
 			}
+		}
+	}
+	for _, ep := range extraPackagings {
+		if ep.PackagingID != "" && ep.Qty > 0 {
+			pkgRestores[ep.PackagingID] += ep.Qty
 		}
 	}
 

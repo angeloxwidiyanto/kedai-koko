@@ -125,6 +125,38 @@ func TestVoidRestoresPackaging(t *testing.T) {
 	}
 }
 
+func TestVoidRestoresExtraPackaging(t *testing.T) {
+	s := newTestStore()
+	s.packaging = 20
+	s.packagings = []model.Packaging{{ID: "paper-bowl", Name: "Paper Bowl", Stock: 10}}
+
+	o, err := s.CreateOrder(model.CreateOrderRequest{
+		Items:           []model.OrderItemInput{},
+		PackagingQty:    3,
+		ExtraPackagings: []model.OrderPackagingInput{{PackagingID: "paper-bowl", Qty: 3}},
+		PaymentMethod:   "tunai",
+	}, testAdmin())
+	if err != nil {
+		t.Fatalf("order: %v", err)
+	}
+	if s.packaging != 17 {
+		t.Fatalf("expected legacy packaging 17, got %d", s.packaging)
+	}
+	if s.packagings[0].Stock != 7 {
+		t.Fatalf("expected paper-bowl stock 7, got %d", s.packagings[0].Stock)
+	}
+
+	if _, err := s.VoidOrder(o.ID, "salah", "Admin"); err != nil {
+		t.Fatalf("void: %v", err)
+	}
+	if s.packaging != 20 {
+		t.Fatalf("legacy packaging should be restored to 20, got %d", s.packaging)
+	}
+	if s.packagings[0].Stock != 10 {
+		t.Fatalf("paper-bowl stock should be restored to 10, got %d", s.packagings[0].Stock)
+	}
+}
+
 func TestPackagingStockMethods(t *testing.T) {
 	s := newTestStore()
 	s.packaging = 50
